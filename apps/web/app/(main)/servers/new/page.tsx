@@ -147,15 +147,18 @@ export default function CreateServerPage() {
       .catch(() => {});
   }, [isMinecraftEgg]);
 
+  const [mcVersionsObj, setMcVersionsObj] = useState<Record<string, any>>({});
+
   // Fetch MC versions when type changes — GET /api/v2/builds/{TYPE} returns object keyed by version
   useEffect(() => {
-    if (!selectedMcType) { setMcVersions([]); setSelectedMcVersion(''); setMcBuilds([]); setSelectedMcBuild(''); return; }
+    if (!selectedMcType) { setMcVersions([]); setMcVersionsObj({}); setSelectedMcVersion(''); setMcBuilds([]); setSelectedMcBuild(''); return; }
     setMcLoading(true);
     fetch(`https://mcjars.app/api/v2/builds/${selectedMcType}`)
       .then((r) => r.json())
       .then((d) => {
         // Response: { builds: { "1.21.4": { latest: {...}, ... }, ... } }
         const versionsObj: Record<string, any> = d.builds ?? {};
+        setMcVersionsObj(versionsObj);
         // Sort versions descending (newest first) by keeping stable order from API
         const versions = Object.keys(versionsObj).reverse();
         setMcVersions(versions);
@@ -167,35 +170,48 @@ export default function CreateServerPage() {
       .finally(() => setMcLoading(false));
   }, [selectedMcType]);
 
+  const applyBuildToEnv = (build: any, version: string) => {
+    const buildNum = build.buildNumber?.toString() ?? build.id?.toString() ?? '';
+    const steps: any[] = build.installation?.[0] ?? [];
+    const jarStep = steps.find((s: any) => s.type === 'download');
+    const jarUrl = jarStep?.url ?? build.jarUrl ?? '';
+    const jarFile = jarStep?.file ?? 'server.jar';
+    setSelectedMcBuild(buildNum);
+    setEnvOverrides((prev) => {
+      const next = { ...prev };
+      if (mcVersionVar) next[mcVersionVar.env_variable] = version;
+      if (mcBuildVar) next[mcBuildVar.env_variable] = buildNum;
+      if (mcJarVar) next[mcJarVar.env_variable] = jarUrl;
+      if (mcJarFileVar) next[mcJarFileVar.env_variable] = jarFile;
+      return next;
+    });
+  };
+
   // Fetch builds when version changes — GET /api/v2/builds/{TYPE}/{VERSION}
   useEffect(() => {
     if (!selectedMcType || !selectedMcVersion) { setMcBuilds([]); setSelectedMcBuild(''); return; }
     setMcLoading(true);
     fetch(`https://mcjars.app/api/v2/builds/${selectedMcType}/${selectedMcVersion}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.resolve(null)))
       .then((d) => {
-        const builds: any[] = d.builds ?? [];
-        setMcBuilds(builds);
+        const builds: any[] = d?.builds ?? [];
         if (builds.length > 0) {
-          const latest = builds[0];
-          const buildNum = latest.buildNumber?.toString() ?? latest.id?.toString() ?? '';
-          setSelectedMcBuild(buildNum);
-          // Get the jar download URL from the installation steps
-          const steps: any[] = latest.installation?.[0] ?? [];
-          const jarStep = steps.find((s: any) => s.type === 'download');
-          const jarUrl = jarStep?.url ?? latest.jarUrl ?? '';
-          const jarFile = jarStep?.file ?? 'server.jar';
-          setEnvOverrides((prev) => {
-            const next = { ...prev };
-            if (mcVersionVar) next[mcVersionVar.env_variable] = selectedMcVersion;
-            if (mcBuildVar) next[mcBuildVar.env_variable] = buildNum;
-            if (mcJarVar) next[mcJarVar.env_variable] = jarUrl;
-            if (mcJarFileVar) next[mcJarFileVar.env_variable] = jarFile;
-            return next;
-          });
+          setMcBuilds(builds);
+          applyBuildToEnv(builds[0], selectedMcVersion);
+        } else {
+          // Sub-endpoint unavailable (e.g. snapshot versions) — fall back to latest from versions list
+          setMcBuilds([]);
+          const versionData = mcVersionsObj[selectedMcVersion];
+          const latest = versionData?.latest ?? versionData;
+          if (latest) applyBuildToEnv(latest, selectedMcVersion);
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        setMcBuilds([]);
+        const versionData = mcVersionsObj[selectedMcVersion];
+        const latest = versionData?.latest ?? versionData;
+        if (latest) applyBuildToEnv(latest, selectedMcVersion);
+      })
       .finally(() => setMcLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMcType, selectedMcVersion]);
@@ -498,21 +514,7 @@ export default function CreateServerPage() {
                         const bid = e.target.value;
                         setSelectedMcBuild(bid);
                         const build = mcBuilds.find((b) => b.buildNumber?.toString() === bid || b.id?.toString() === bid);
-                        if (build) {
-                          const buildNum = build.buildNumber?.toString() ?? build.id?.toString() ?? '';
-                          const steps: any[] = build.installation?.[0] ?? [];
-                          const jarStep = steps.find((s: any) => s.type === 'download');
-                          const jarUrl = jarStep?.url ?? build.jarUrl ?? '';
-                          const jarFile = jarStep?.file ?? 'server.jar';
-                          setEnvOverrides((prev) => {
-                            const next = { ...prev };
-                            if (mcVersionVar) next[mcVersionVar.env_variable] = selectedMcVersion;
-                            if (mcBuildVar) next[mcBuildVar.env_variable] = buildNum;
-                            if (mcJarVar) next[mcJarVar.env_variable] = jarUrl;
-                            if (mcJarFileVar) next[mcJarFileVar.env_variable] = jarFile;
-                            return next;
-                          });
-                        }
+                        if (build) applyBuildToEnv(build, selectedMcVersion);
                       }}
                     >
                       {mcBuilds.map((b) => (
