@@ -9,7 +9,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
 import { SettingsModule } from './settings/settings.module.js';
-import { CalagopusModule } from './pelican/pelican.module.js';
+import { CalagopusModule } from './calagopus/calagopus.module.js';
 import { ServersModule } from './servers/servers.module.js';
 import { StoreModule } from './store/store.module.js';
 import { AdminModule } from './admin/admin.module.js';

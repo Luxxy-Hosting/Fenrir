@@ -26,7 +26,7 @@ export class ServersController {
   }
 
   @Post()
-  @Throttle({ short: { ttl: 10000, limit: 1 }, medium: { ttl: 60000, limit: 3 }, long: { ttl: 300000, limit: 5 } })
+  @Throttle({ short: { ttl: 30000, limit: 3 }, medium: { ttl: 300000, limit: 5 }, long: { ttl: 1800000, limit: 10 } })
   async createServer(@Request() req: any, @Body() body: any) {
     return this.serversService.createServer(req.user.id, body);
   }

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { CalagopusService } from './pelican.service.js';
+import { CalagopusService } from './calagopus.service.js';
 import { SettingsModule } from '../settings/settings.module.js';
 
 @Module({

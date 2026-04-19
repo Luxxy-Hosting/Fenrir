@@ -28,6 +28,7 @@ import {
   FileTextIcon,
   DownloadIcon,
   UploadIcon,
+  CoinsIcon,
   TrashIcon,
   PlusIcon,
   ArchiveIcon,
@@ -65,7 +66,7 @@ import {
   DialogTitle,
 } from '@workspace/ui/components/dialog';
 
-type Tab = 'console' | 'files' | 'backups' | 'startup' | 'settings' | 'activity';
+type Tab = 'console' | 'files' | 'backups' | 'startup' | 'resources' | 'settings' | 'activity';
 
 interface FileEntry {
   name: string;
@@ -108,7 +109,7 @@ export default function ServerDetailPage() {
   const uuid = params.uuid as string;
 
   const searchParams = useSearchParams();
-  const validTabs: Tab[] = ['console', 'files', 'backups', 'startup', 'settings', 'activity'];
+  const validTabs: Tab[] = ['console', 'files', 'backups', 'startup', 'resources', 'settings', 'activity'];
   const initialTab = validTabs.includes(searchParams.get('tab') as Tab) ? (searchParams.get('tab') as Tab) : 'console';
   const [tab, setTabState] = useState<Tab>(initialTab);
   const setTab = useCallback((t: Tab) => {
@@ -134,6 +135,7 @@ export default function ServerDetailPage() {
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const wsReconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [wsConnected, setWsConnected] = useState(false);
   const historyBufferRef = useRef<string[]>([]);
   const logsSentRef = useRef(false);
@@ -273,7 +275,8 @@ export default function ServerDetailPage() {
 
       socket.onclose = () => {
         setWsConnected(false); wsRef.current = null; logsSentRef.current = false;
-        setTimeout(() => connectWs(), 3000);
+        if (wsReconnectRef.current) clearTimeout(wsReconnectRef.current);
+        wsReconnectRef.current = setTimeout(() => { connectWs(); }, 3000);
       };
       socket.onerror = () => { setWsConnected(false); wsRef.current = null; };
       wsRef.current = socket;
@@ -282,10 +285,19 @@ export default function ServerDetailPage() {
     }
   }, [token, uuid]);
 
+  // Connect once after server loads — don't reconnect on every server state update
+  const serverLoadedRef = useRef(false);
   useEffect(() => {
-    if (server && !wsRef.current) connectWs();
-    return () => { if (wsRef.current) { wsRef.current.close(); wsRef.current = null; } };
-  }, [server, connectWs]);
+    if (server && !serverLoadedRef.current) {
+      serverLoadedRef.current = true;
+      connectWs();
+    }
+    return () => {
+      if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+      if (wsReconnectRef.current) { clearTimeout(wsReconnectRef.current); wsReconnectRef.current = null; }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [server]);
 
   // xterm.js initialization via callback ref
   const terminalCallbackRef = useCallback((node: HTMLDivElement | null) => {
@@ -701,11 +713,13 @@ export default function ServerDetailPage() {
   const statusColor = serverState === 'running' ? 'bg-emerald-500' :
     serverState === 'starting' ? 'bg-yellow-500' :
     serverState === 'stopping' ? 'bg-orange-500' :
+    serverState === 'installing' ? 'bg-blue-500 animate-pulse' :
     serverState === 'install_failed' ? 'bg-destructive' : 'bg-muted-foreground/50';
 
   const statusLabel = serverState === 'running' ? 'Running' :
     serverState === 'starting' ? 'Starting' :
     serverState === 'stopping' ? 'Stopping' :
+    serverState === 'installing' ? 'Installing…' :
     serverState === 'install_failed' ? 'Install Failed' : 'Offline';
 
   const pathParts = currentPath.split('/').filter(Boolean);
@@ -734,12 +748,13 @@ export default function ServerDetailPage() {
     { key: 'files', label: 'Files', icon: <FolderIcon className="size-4" /> },
     { key: 'backups', label: 'Backups', icon: <DatabaseIcon className="size-4" /> },
     { key: 'startup', label: 'Startup', icon: <CpuIcon className="size-4" /> },
+    { key: 'resources', label: 'Resources', icon: <CoinsIcon className="size-4" /> },
     { key: 'settings', label: 'Settings', icon: <SettingsIcon className="size-4" /> },
     { key: 'activity', label: 'Activity', icon: <ClockIcon className="size-4" /> },
   ];
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-6 min-w-0 overflow-hidden">
+    <div className="flex flex-1 flex-col gap-4 p-6 min-w-0 overflow-auto">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" asChild>
@@ -833,7 +848,7 @@ export default function ServerDetailPage() {
 
       {/* ═══ CONSOLE TAB ═══ */}
       {tab === 'console' && (
-        <div className="flex flex-col flex-1 min-h-0">
+        <div className="flex flex-col flex-1 min-h-[600px]">
           {/* Console container */}
           <div className="flex flex-col flex-1 min-h-0 min-w-0 rounded-lg border bg-card overflow-hidden">
             {/* Console toolbar */}
@@ -1254,6 +1269,17 @@ export default function ServerDetailPage() {
         </Card>
       )}
 
+      {/* ═══ RESOURCES TAB ═══ */}
+      {tab === 'resources' && (
+        <ResourcesUpgradeTab
+          token={token!}
+          uuid={uuid}
+          server={server}
+          resources={resources}
+          onUpgraded={loadServer}
+        />
+      )}
+
       {/* ═══ SETTINGS TAB ═══ */}
       {tab === 'settings' && (
         <div className="space-y-4">
@@ -1398,6 +1424,220 @@ export default function ServerDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function ResourcesUpgradeTab({
+  token,
+  uuid,
+  server,
+  resources,
+  onUpgraded,
+}: {
+  token: string;
+  uuid: string;
+  server: any;
+  resources: any;
+  onUpgraded: () => void;
+}) {
+  const [storeItems, setStoreItems] = useState<any[]>([]);
+  const [userRes, setUserRes] = useState<any>(null);
+  const [newRam, setNewRam] = useState(0);
+  const [newDisk, setNewDisk] = useState(0);
+  const [newCpu, setNewCpu] = useState(0);
+  const [upgrading, setUpgrading] = useState(false);
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const currentRam = server?.limits?.memory ?? 0;
+  const currentDisk = server?.limits?.disk ?? 0;
+  const currentCpu = server?.limits?.cpu ?? 0;
+
+  useEffect(() => {
+    if (!token) return;
+    Promise.all([api.store.items(token), api.store.resources(token)])
+      .then(([items, res]) => {
+        setStoreItems(items);
+        setUserRes(res);
+        setNewRam(currentRam);
+        setNewDisk(currentDisk);
+        setNewCpu(currentCpu);
+      })
+      .catch(() => {});
+  }, [token, currentRam, currentDisk, currentCpu]);
+
+  const coins = userRes?.coins ?? 0;
+  const availRam = resources?.available?.ram ?? 0;
+  const availDisk = resources?.available?.disk ?? 0;
+  const availCpu = resources?.available?.cpu ?? 0;
+
+  const maxRam = currentRam + availRam;
+  const maxDisk = currentDisk + availDisk;
+  const maxCpu = currentCpu + availCpu;
+
+  const ramDelta = newRam - currentRam;
+  const diskDelta = newDisk - currentDisk;
+  const cpuDelta = newCpu - currentCpu;
+
+  // Cost = delta / storeItem.amount * price
+  const costFor = (resource: string, delta: number) => {
+    if (delta <= 0) return 0;
+    const item = storeItems.find((i) => i.resource === resource);
+    if (!item || !item.amount) return 0;
+    return Math.ceil(delta / item.amount) * item.price;
+  };
+
+  const totalCost = costFor('ram', ramDelta) + costFor('disk', diskDelta) + costFor('cpu', cpuDelta);
+  const hasChanges = ramDelta !== 0 || diskDelta !== 0 || cpuDelta !== 0;
+
+  const handleUpgrade = async () => {
+    if (!hasChanges) return;
+    setUpgrading(true);
+    setMsg(null);
+    try {
+      await api.servers.modify(token, uuid, { ram: newRam, disk: newDisk, cpu: newCpu });
+      setMsg({ type: 'success', text: 'Server resources updated successfully.' });
+      onUpgraded();
+    } catch (err: any) {
+      setMsg({ type: 'error', text: err.message });
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
+  const ResourceRow = ({
+    label,
+    icon,
+    current,
+    value,
+    max,
+    unit,
+    step,
+    resource,
+    onChange,
+  }: {
+    label: string;
+    icon: React.ReactNode;
+    current: number;
+    value: number;
+    max: number;
+    unit: string;
+    step: number;
+    resource: string;
+    onChange: (v: number) => void;
+  }) => {
+    const delta = value - current;
+    const cost = costFor(resource, delta);
+    const item = storeItems.find((i) => i.resource === resource);
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            {icon}
+            {label}
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            {delta > 0 && (
+              <span className="text-muted-foreground flex items-center gap-1">
+                <CoinsIcon className="size-3" /> {cost} coins
+              </span>
+            )}
+            <span className="font-mono tabular-nums">
+              {value.toLocaleString()} {unit}
+            </span>
+          </div>
+        </div>
+        <input
+          type="range"
+          min={current}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full accent-primary"
+          disabled={max <= current}
+        />
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>Current: {current.toLocaleString()} {unit}</span>
+          {item && <span>{item.price} coins / {item.amount} {unit}</span>}
+          <span>Max: {max.toLocaleString()} {unit}</span>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <div>
+            <CardTitle>Upgrade Resources</CardTitle>
+            <CardDescription>Allocate more resources to this server using your available quota.</CardDescription>
+          </div>
+          <div className="flex items-center gap-1.5 text-sm font-medium">
+            <CoinsIcon className="size-4 text-yellow-500" />
+            <span>{coins.toFixed(0)} coins</span>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {msg && (
+            <div className={`rounded-md p-3 text-sm ${msg.type === 'success' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-destructive/10 text-destructive'}`}>
+              {msg.text}
+            </div>
+          )}
+
+          <ResourceRow
+            label="RAM"
+            icon={<MemoryStickIcon className="size-4" />}
+            current={currentRam}
+            value={newRam}
+            max={maxRam}
+            unit="MB"
+            step={256}
+            resource="ram"
+            onChange={setNewRam}
+          />
+
+          <ResourceRow
+            label="Disk"
+            icon={<HardDriveIcon className="size-4" />}
+            current={currentDisk}
+            value={newDisk}
+            max={maxDisk}
+            unit="MB"
+            step={256}
+            resource="disk"
+            onChange={setNewDisk}
+          />
+
+          <ResourceRow
+            label="CPU"
+            icon={<CpuIcon className="size-4" />}
+            current={currentCpu}
+            value={newCpu}
+            max={maxCpu}
+            unit="%"
+            step={25}
+            resource="cpu"
+            onChange={setNewCpu}
+          />
+
+          {hasChanges && (
+            <div className="rounded-lg border bg-muted/30 p-3 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                {totalCost > 0 ? `Total cost: ${totalCost} coins` : 'No extra cost — using available quota'}
+              </span>
+              <Button onClick={handleUpgrade} disabled={upgrading || (totalCost > coins && totalCost > 0)}>
+                {upgrading ? 'Applying…' : 'Apply Changes'}
+              </Button>
+            </div>
+          )}
+
+          {!hasChanges && (
+            <p className="text-center text-sm text-muted-foreground py-2">Drag the sliders above to adjust resources.</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

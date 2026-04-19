@@ -2,7 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { CalagopusService } from '../pelican/pelican.service.js';
+import { CalagopusService } from '../calagopus/calagopus.service.js';
 
 @Injectable()
 export class OAuthService {

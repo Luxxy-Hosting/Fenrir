@@ -1,6 +1,6 @@
-import { Injectable, ForbiddenException, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, ForbiddenException, BadRequestException, NotFoundException, ConflictException, HttpException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { CalagopusService } from '../pelican/pelican.service.js';
+import { CalagopusService } from '../calagopus/calagopus.service.js';
 
 @Injectable()
 export class ServersService {
@@ -57,8 +57,23 @@ export class ServersService {
       return { servers: [], resources: this.computeAvailableResources(resources, []) };
     }
     try {
-      const res = await this.calagopus.getUserServers(resources.calagopusId);
-      const servers = res?.servers?.data ?? [];
+      let res: any;
+      try {
+        res = await this.calagopus.getUserServers(resources.calagopusId);
+      } catch (err: any) {
+        const status = err instanceof HttpException ? err.getStatus() : 0;
+        if (status === 404 || err.message?.toLowerCase().includes('not found')) {
+          return { servers: [], resources: this.computeAvailableResources(resources, []) };
+        }
+        throw err;
+      }
+      const allServers = res?.servers?.data ?? [];
+
+      // Only show servers whose egg exists in our local DB (i.e. created through this panel)
+      const knownEggs = await this.prisma.egg.findMany({ select: { remoteUuid: true } });
+      const knownEggUuids = new Set(knownEggs.map((e) => e.remoteUuid));
+      const servers = allServers.filter((s: any) => knownEggUuids.has(s.egg?.uuid));
+
       return {
         servers: servers.map((s: any) => ({
           uuid: s.uuid,
@@ -146,10 +161,18 @@ export class ServersService {
     environment?: Record<string, string>;
     dockerImage?: string;
   }) {
-    const resources = await this.getUserResources(userId);
+    const trimmedName = data.name?.trim() ?? '';
+    if (trimmedName.length < 3) throw new BadRequestException('Server name must be at least 3 characters.');
+    if (trimmedName.length > 64) throw new BadRequestException('Server name must be at most 64 characters.');
+    data.name = trimmedName;
+
+    let resources = await this.getUserResources(userId);
     if (!resources.calagopusId) {
       throw new BadRequestException('No Calagopus account linked. Contact admin.');
     }
+
+    // Ensure panel user is valid — re-create if missing or stale
+    resources = await this.ensurePanelUser(userId, resources);
 
     // Fetch egg config from DB (support lookup by id, name, or remoteUuid)
     let eggConfig = await this.prisma.egg.findUnique({ where: { id: data.egg } });
@@ -164,7 +187,7 @@ export class ServersService {
     // Get current servers for resource check — fresh fetch inside lock
     let currentServers: any[] = [];
     try {
-      const res = await this.calagopus.getUserServers(resources.calagopusId);
+      const res = await this.calagopus.getUserServers(resources.calagopusId!);
       currentServers = res?.servers?.data ?? [];
     } catch { /* empty */ }
 
@@ -184,14 +207,13 @@ export class ServersService {
     if (data.disk > eggConfig.maxDisk) throw new BadRequestException(`Maximum disk: ${eggConfig.maxDisk} MB`);
     if (data.cpu > eggConfig.maxCpu) throw new BadRequestException(`Maximum CPU: ${eggConfig.maxCpu}%`);
 
-    // Build environment from stored variables (now an array of variable metadata)
+    // Build environment from stored variables
     const rawEnv = typeof eggConfig.environment === 'string' ? JSON.parse(eggConfig.environment) : (eggConfig.environment || []);
     let environment: Record<string, string> = {};
     if (Array.isArray(rawEnv)) {
       for (const v of rawEnv) {
         environment[v.env_variable] = v.default_value ?? '';
       }
-      // Merge user overrides (only for user_editable vars)
       if (data.environment) {
         for (const [key, val] of Object.entries(data.environment)) {
           const varDef = rawEnv.find((v: any) => v.env_variable === key);
@@ -203,6 +225,7 @@ export class ServersService {
     } else {
       environment = rawEnv;
     }
+
     const rawFeatureLimits = typeof eggConfig.featureLimits === 'string' ? JSON.parse(eggConfig.featureLimits) : (eggConfig.featureLimits || {});
     const featureLimits = {
       allocations: rawFeatureLimits.allocations ?? 1,
@@ -210,21 +233,6 @@ export class ServersService {
       backups: rawFeatureLimits.backups ?? 0,
       schedules: rawFeatureLimits.schedules ?? 0,
     };
-
-    // Find nodes in this location from local DB
-    const nodesInLocation = await this.prisma.node.findMany({
-      where: { locationUuid: locationConfig.remoteUuid },
-    });
-    if (nodesInLocation.length === 0) {
-      throw new BadRequestException('No nodes in this location. Sync nodes in Admin > Sync.');
-    }
-
-    // Find available allocation on a node in the selected location
-    const nodeUuids = nodesInLocation.map((n) => n.remoteUuid);
-    const allocation = await this.calagopus.findAvailableAllocation(locationConfig.remoteUuid, nodeUuids);
-    if (!allocation) {
-      throw new BadRequestException('No available allocations in this location. Contact admin.');
-    }
 
     // Validate docker image selection
     let selectedImage = eggConfig.dockerImage || 'ghcr.io/pterodactyl/yolks:java_21';
@@ -237,20 +245,21 @@ export class ServersService {
       }
     }
 
-    // Convert environment map to variables array as required by Pelican API
     const variables = Object.entries(environment).map(([env_variable, value]) => ({
       env_variable,
       value: String(value),
     }));
 
-    const serverSpec = {
+    // Find the port variable from the egg environment (SERVER_PORT, PORT, etc.)
+    const portVarNames = ['SERVER_PORT', 'PORT', 'GAME_PORT', 'QUERY_PORT', 'SERVER_PORT_1'];
+    const portVar = Array.isArray(rawEnv)
+      ? (rawEnv.find((v: any) => portVarNames.includes(v.env_variable))?.env_variable ?? portVarNames[0])
+      : portVarNames[0];
+
+    const deploySpec = {
       name: data.name.trim(),
       description: null,
-      owner_uuid: resources.calagopusId,
       egg_uuid: eggConfig.remoteUuid,
-      node_uuid: allocation.nodeUuid,
-      allocation_uuid: allocation.allocationUuid,
-      allocation_uuids: [allocation.allocationUuid],
       startup: eggConfig.startup,
       image: selectedImage,
       variables,
@@ -263,6 +272,19 @@ export class ServersService {
         io_weight: 500,
       },
       feature_limits: featureLimits,
+      deployment: {
+        location_uuids: [locationConfig.remoteUuid],
+        allow_overallocation: false,
+        allocations: {
+          dedicated: false,
+          primary: {
+            start_port: 1024,
+            end_port: 65535,
+            assign_to_variable: portVar,
+          },
+          additional: [],
+        },
+      },
       start_on_completion: true,
       skip_installer: false,
       pinned_cpus: [] as number[],
@@ -270,21 +292,60 @@ export class ServersService {
       kvm_passthrough_enabled: false,
     };
 
+    const runDeploy = async (ownerUuid: string) => {
+      const spec = { ...deploySpec, owner_uuid: ownerUuid };
+      const result = await this.calagopus.deployServer(spec);
+      return result.server ?? result;
+    };
+
     try {
-      console.log('[ServersService] Creating server with spec:', JSON.stringify(serverSpec, null, 2));
-      const result = await this.calagopus.createServer(serverSpec);
-      const server = result.server ?? result;
-      return {
-        success: true,
-        server: {
-          uuid: server.uuid,
-          uuidShort: server.uuid_short,
-          name: server.name,
-        },
-      };
+      const server = await runDeploy(resources.calagopusId!);
+      return { success: true, server: { uuid: server.uuid, uuidShort: server.uuid_short, name: server.name } };
     } catch (err: any) {
-      console.error('[ServersService] Create server failed:', err.message);
+      const isOwnerErr = err.message?.toLowerCase().includes('owner') || err.message?.toLowerCase().includes('owner_uuid');
+      if (isOwnerErr) {
+        // Force re-create the panel user and retry once
+        resources = await this.ensurePanelUser(userId, resources, true);
+        try {
+          const server = await runDeploy(resources.calagopusId!);
+          return { success: true, server: { uuid: server.uuid, uuidShort: server.uuid_short, name: server.name } };
+        } catch (retryErr: any) {
+          throw new BadRequestException(retryErr.message || 'Failed to create server after re-linking panel account');
+        }
+      }
       throw new BadRequestException(err.message || 'Failed to create server');
+    }
+  }
+
+  private async ensurePanelUser(userId: string, resources: any, forceRecreate = false): Promise<any> {
+    if (!forceRecreate) {
+      try {
+        const data = await this.calagopus.getUserByUuid(resources.calagopusId);
+        const user = data?.user ?? data;
+        if (user?.uuid) return resources;
+      } catch (err: any) {
+        const status = err instanceof HttpException ? err.getStatus() : 0;
+        if (status !== 404 && !err.message?.toLowerCase().includes('not found')) throw err;
+      }
+    }
+    // Re-create panel user
+    const panelUser = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!panelUser) throw new BadRequestException('User not found');
+    const username = (panelUser.name || panelUser.email.split('@')[0]).replace(/[^a-zA-Z0-9_.-]/g, '_');
+    try {
+      const created = await this.calagopus.createUser({
+        username,
+        email: panelUser.email,
+        name: panelUser.name || username,
+        password: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
+        external_id: panelUser.id,
+      });
+      const newCid = created?.user?.uuid ?? created?.uuid ?? null;
+      if (!newCid) throw new Error('No UUID returned from panel');
+      await this.prisma.userResources.update({ where: { userId }, data: { calagopusId: newCid } });
+      return this.getUserResources(userId);
+    } catch (createErr: any) {
+      throw new BadRequestException('Could not create panel account: ' + (createErr.message || ''));
     }
   }
 
@@ -396,7 +457,7 @@ export class ServersService {
       return await this.calagopus.clientGetServerResources(serverUuid);
     } catch (err: any) {
       if (err.message?.includes('409')) {
-        return { state: 'install_failed', cpu_absolute: 0, memory_bytes: 0, disk_bytes: 0, network: { tx_bytes: 0, rx_bytes: 0 } };
+        return { state: 'installing', cpu_absolute: 0, memory_bytes: 0, disk_bytes: 0, network: { tx_bytes: 0, rx_bytes: 0 } };
       }
       throw err;
     }

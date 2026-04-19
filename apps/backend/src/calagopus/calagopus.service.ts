@@ -58,7 +58,7 @@ export class CalagopusService {
     const res = await fetch(fullUrl, {
       method,
       headers,
-      body: body ? JSON.stringify(body) : undefined,
+      body: method !== 'GET' ? JSON.stringify(body ?? {}) : undefined,
     });
 
     if (!res.ok) {
@@ -181,12 +181,32 @@ export class CalagopusService {
     return this.request<any>('/api/admin/servers', { method: 'POST', body: data });
   }
 
+  async deployServer(data: {
+    name: string;
+    description?: string | null;
+    owner_uuid?: string;
+    egg_uuid: string;
+    startup: string;
+    image: string;
+    variables: { env_variable: string; value: string }[];
+    limits: { cpu: number; memory: number; memory_overhead: number; swap: number; disk: number; io_weight?: number };
+    feature_limits: { allocations: number; databases: number; backups: number; schedules: number };
+    deployment: { location_uuids: string[]; allow_overallocation?: boolean; allocations?: { dedicated: boolean; primary: { start_port: number; end_port: number; assign_to_variable: string }; additional: any[] } };
+    start_on_completion: boolean;
+    skip_installer: boolean;
+    pinned_cpus: number[];
+    hugepages_passthrough_enabled: boolean;
+    kvm_passthrough_enabled: boolean;
+  }) {
+    return this.request<any>('/api/admin/servers/deploy', { method: 'POST', body: data });
+  }
+
   async updateServer(uuid: string, data: any) {
     return this.request<any>(`/api/admin/servers/${uuid}`, { method: 'PATCH', body: data });
   }
 
-  async deleteServer(uuid: string) {
-    return this.request<any>(`/api/admin/servers/${uuid}`, { method: 'DELETE' });
+  async deleteServer(uuid: string, force = true, deleteBackups = true) {
+    return this.request<any>(`/api/admin/servers/${uuid}`, { method: 'DELETE', body: { force, delete_backups: deleteBackups } });
   }
 
   async suspendServer(uuid: string) {

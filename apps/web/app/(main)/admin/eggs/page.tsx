@@ -140,12 +140,24 @@ export default function AdminEggsPage() {
       )}
 
       {eggs.length > 0 && (
-        <Card>
-          <CardContent className="p-0">
-            <div className="divide-y divide-border">
+        <div className="rounded-lg border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground w-10"></th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden md:table-cell">Category</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell">UUID</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell">RAM</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell">Disk</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell">CPU</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
               {eggs.map((egg) => (
-                <div key={egg.id} className="flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-3">
+                <tr key={egg.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3">
                     {egg.logo ? (
                       <img src={egg.logo} alt={egg.displayName} className="size-8 rounded-md object-contain" />
                     ) : (
@@ -153,30 +165,41 @@ export default function AdminEggsPage() {
                         {egg.displayName.charAt(0)}
                       </div>
                     )}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{egg.displayName}</p>
-                        <Badge variant="secondary">{egg.category}</Badge>
-                        <Badge variant="outline">{egg.remoteUuid.slice(0, 8)}...</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        RAM: {egg.minRam}–{egg.maxRam} MB · Disk: {egg.minDisk}–{egg.maxDisk} MB · CPU: {egg.minCpu}–{egg.maxCpu}%
-                      </p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="font-medium">{egg.displayName}</p>
+                    <p className="text-xs text-muted-foreground font-mono">{egg.name}</p>
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <Badge variant="secondary">{egg.category}</Badge>
+                  </td>
+                  <td className="px-4 py-3 hidden lg:table-cell">
+                    <span className="font-mono text-xs text-muted-foreground">{egg.remoteUuid.slice(0, 12)}…</span>
+                  </td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground text-xs">
+                    {egg.minRam}–{egg.maxRam} MB
+                  </td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground text-xs">
+                    {egg.minDisk}–{egg.maxDisk} MB
+                  </td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground text-xs">
+                    {egg.minCpu}–{egg.maxCpu}%
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-1 justify-end">
+                      <Button variant="ghost" size="sm" onClick={() => startEdit(egg)} disabled={editing !== null}>
+                        <PencilIcon className="size-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => remove(egg.id)}>
+                        <TrashIcon className="size-4" />
+                      </Button>
                     </div>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => startEdit(egg)} disabled={editing !== null}>
-                      <PencilIcon className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => remove(egg.id)}>
-                      <TrashIcon className="size-4" />
-                    </Button>
-                  </div>
-                </div>
+                  </td>
+                </tr>
               ))}
-            </div>
-          </CardContent>
-        </Card>
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

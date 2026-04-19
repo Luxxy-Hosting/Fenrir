@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { CalagopusService } from '../pelican/pelican.service.js';
+import { CalagopusService } from '../calagopus/calagopus.service.js';
 import { randomUUID } from 'crypto';
 
 @Injectable()

@@ -8,7 +8,7 @@ import { OAuthService } from './oauth.service.js';
 import { TotpController } from './totp.controller.js';
 import { TotpService } from './totp.service.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
-import { CalagopusModule } from '../pelican/pelican.module.js';
+import { CalagopusModule } from '../calagopus/calagopus.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
 
 @Module({

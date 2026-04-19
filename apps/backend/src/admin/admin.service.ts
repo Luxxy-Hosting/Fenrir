@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { CalagopusService } from '../pelican/pelican.service.js';
+import { CalagopusService } from '../calagopus/calagopus.service.js';
 
 @Injectable()
 export class AdminService {

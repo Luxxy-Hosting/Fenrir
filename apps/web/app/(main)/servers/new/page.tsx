@@ -20,6 +20,9 @@ import {
   MemoryStickIcon,
   ArrowLeftIcon,
   RocketIcon,
+  CheckCircle2Icon,
+  CircleIcon,
+  Loader2Icon,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -34,6 +37,8 @@ export default function CreateServerPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const [deployingUuid, setDeployingUuid] = useState<string | null>(null);
+  const [deployStep, setDeployStep] = useState(0);
 
   const [name, setName] = useState('');
   const [selectedEgg, setSelectedEgg] = useState('');
@@ -95,6 +100,59 @@ export default function CreateServerPage() {
     ? currentEgg.environment.filter((v) => v.user_editable && v.user_viewable)
     : [];
 
+  const DEPLOY_STEPS = [
+    'Submitting request',
+    'Allocating resources',
+    'Pulling Docker image',
+    'Running installer',
+    'Starting server',
+    'Ready',
+  ];
+
+  // Poll server status after creation
+  useEffect(() => {
+    if (!deployingUuid) return;
+    const token = getAccessToken();
+    if (!token) return;
+    let cancelled = false;
+    let stepTimer: ReturnType<typeof setTimeout>;
+
+    const advanceStep = (target: number) => {
+      setDeployStep((prev) => (prev < target ? target : prev));
+    };
+
+    // Simulate early steps immediately
+    advanceStep(1);
+    stepTimer = setTimeout(() => advanceStep(2), 1500);
+
+    const poll = async () => {
+      if (cancelled) return;
+      try {
+        const data = await api.servers.get(token, deployingUuid);
+        const status: string = (data?.server?.status as string) ?? '';
+        if (status === 'installing') {
+          advanceStep(3);
+        } else if (!status || status === 'running' || status === 'offline') {
+          advanceStep(5);
+          setTimeout(() => {
+            if (!cancelled) router.push(`/servers/${deployingUuid}`);
+          }, 800);
+          return;
+        } else {
+          advanceStep(3);
+        }
+      } catch { /* keep polling */ }
+      if (!cancelled) setTimeout(poll, 2500);
+    };
+
+    const initialDelay = setTimeout(poll, 2000);
+    return () => {
+      cancelled = true;
+      clearTimeout(stepTimer);
+      clearTimeout(initialDelay);
+    };
+  }, [deployingUuid, router]);
+
   const handleCreate = async () => {
     if (!name.trim()) {
       setError('Server name is required');
@@ -105,7 +163,7 @@ export default function CreateServerPage() {
     setCreating(true);
     setError('');
     try {
-      await api.servers.create(token, {
+      const res = await api.servers.create(token, {
         name: name.trim(),
         ram,
         disk,
@@ -115,13 +173,56 @@ export default function CreateServerPage() {
         environment: Object.keys(envOverrides).length > 0 ? envOverrides : undefined,
         dockerImage: selectedImage || undefined,
       });
-      router.push('/servers');
+      setDeployingUuid(res.server.uuid);
     } catch (err: any) {
       setError(err.message);
-    } finally {
       setCreating(false);
     }
   };
+
+  if (deployingUuid) {
+    const progressPct = Math.round((deployStep / (DEPLOY_STEPS.length - 1)) * 100);
+    const isDone = deployStep >= DEPLOY_STEPS.length - 1;
+    return (
+      <div className="flex flex-1 items-center justify-center p-6">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center pb-2">
+            <div className="flex justify-center mb-3">
+              {isDone
+                ? <CheckCircle2Icon className="size-12 text-green-500" />
+                : <RocketIcon className="size-12 text-primary animate-pulse" />
+              }
+            </div>
+            <CardTitle className="text-xl">{isDone ? 'Server Ready!' : 'Deploying Server'}</CardTitle>
+            <CardDescription>
+              {isDone ? 'Taking you to your server...' : 'Please wait while your server is being set up.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5 pt-2">
+            <Progress value={progressPct} className="h-2" />
+            <ol className="space-y-3">
+              {DEPLOY_STEPS.map((step, i) => {
+                const done = deployStep > i;
+                const active = deployStep === i;
+                return (
+                  <li key={step} className={`flex items-center gap-3 text-sm transition-colors ${done ? 'text-foreground' : active ? 'text-foreground' : 'text-muted-foreground/40'}`}>
+                    {done ? (
+                      <CheckCircle2Icon className="size-4 shrink-0 text-green-500" />
+                    ) : active ? (
+                      <Loader2Icon className="size-4 shrink-0 animate-spin text-primary" />
+                    ) : (
+                      <CircleIcon className="size-4 shrink-0" />
+                    )}
+                    <span className={active ? 'font-medium' : ''}>{step}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -140,7 +241,7 @@ export default function CreateServerPage() {
   }, {});
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
+    <div className="flex flex-1 flex-col gap-6 p-6 overflow-auto">
       <div className="flex items-center gap-4">
         <Button asChild variant="ghost" size="sm">
           <Link href="/servers">
@@ -276,7 +377,13 @@ export default function CreateServerPage() {
                     }`}
                     onClick={() => setSelectedLocation(loc.remoteUuid)}
                   >
-                    {loc.flag && <span className="text-lg">{loc.flag}</span>}
+                    {loc.flag && (
+                      <img
+                        src={`https://flagcdn.com/w40/${loc.flag.toLowerCase()}.png`}
+                        alt={loc.flag}
+                        className="h-4 w-6 object-cover rounded-sm"
+                      />
+                    )}
                     <div className="text-left">
                       <p className="font-medium">{loc.name}</p>
                       <p className="text-xs text-muted-foreground">{loc.short}</p>

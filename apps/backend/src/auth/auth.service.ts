@@ -8,7 +8,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { CalagopusService } from '../pelican/pelican.service.js';
+import { CalagopusService } from '../calagopus/calagopus.service.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { randomUUID, randomBytes } from 'crypto';
