@@ -13,18 +13,20 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String?
-  avatar    String?
-  roleId    String
-  role      Role     @relation(fields: [roleId], references: [id])
-  sessions  Session[]
-  passkeys  Passkey[]
-  resources UserResources?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(uuid())
+  email          String   @unique
+  password       String
+  name           String?
+  avatar         String?
+  emailVerified  Boolean  @default(false)
+  emailToken     String?  @unique
+  roleId         String
+  role           Role     @relation(fields: [roleId], references: [id])
+  sessions       Session[]
+  passkeys       Passkey[]
+  resources      UserResources?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model Passkey {

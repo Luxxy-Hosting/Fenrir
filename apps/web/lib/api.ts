@@ -204,6 +204,9 @@ export const api = {
 
     set: (token: string, key: string, value: string) =>
       request<{ message: string }>(`/settings/${key}`, { method: 'PUT', token, body: { value } }),
+
+    testEmail: (token: string, email: string) =>
+      request<{ success: boolean; error?: string }>('/settings/test-email', { method: 'POST', token, body: { email } }),
   },
 
   servers: {

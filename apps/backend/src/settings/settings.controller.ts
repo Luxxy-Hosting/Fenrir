@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Put,
   Body,
   UseGuards,
@@ -11,10 +12,14 @@ import { SettingsService } from './settings.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
+import { MailService } from '../mail/mail.service.js';
 
 @Controller('settings')
 export class SettingsController {
-  constructor(private settingsService: SettingsService) {}
+  constructor(
+    private settingsService: SettingsService,
+    private mailService: MailService,
+  ) {}
 
   // Public endpoint — no auth required
   @Get('brand')
@@ -30,6 +35,12 @@ export class SettingsController {
     // Mask the API key for security
     if (settings['panel.apiKey']) {
       settings['panel.apiKey'] = settings['panel.apiKey'].substring(0, 8) + '...';
+    }
+    if (settings['openapi.key']) {
+      settings['openapi.key'] = settings['openapi.key'].substring(0, 8) + '...';
+    }
+    if (settings['mail.pass']) {
+      settings['mail.pass'] = '••••••••';
     }
     return settings;
   }
@@ -67,5 +78,13 @@ export class SettingsController {
   async delete(@Param('key') key: string) {
     await this.settingsService.delete(key);
     return { message: `Setting '${key}' deleted` };
+  }
+
+  @Post('test-email')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  async sendTestEmail(@Body('email') email: string) {
+    if (!email) return { success: false, error: 'Email address is required' };
+    return this.mailService.sendTestEmail(email);
   }
 }

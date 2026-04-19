@@ -5,6 +5,7 @@ import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
 import { CalagopusModule } from '../pelican/pelican.module.js';
+import { SettingsModule } from '../settings/settings.module.js';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { CalagopusModule } from '../pelican/pelican.module.js';
       signOptions: { expiresIn: '15m' },
     }),
     CalagopusModule,
+    SettingsModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

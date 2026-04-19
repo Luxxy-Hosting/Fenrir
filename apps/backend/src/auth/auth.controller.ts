@@ -36,6 +36,14 @@ export class AuthController {
     return this.authService.login(dto, req.ip, req.headers['user-agent']);
   }
 
+  @Get('verify-email')
+  async verifyEmail(@Req() req: Request) {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const token = url.searchParams.get('token');
+    if (!token) throw new UnauthorizedException('Missing token');
+    return this.authService.verifyEmail(token);
+  }
+
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(@Body('refreshToken') refreshToken: string) {

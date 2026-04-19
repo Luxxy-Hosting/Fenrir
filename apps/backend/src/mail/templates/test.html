@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test email</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#0a0a0a;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="background-color:#111111;border-radius:12px;border:1px solid #222222;">
+          <!-- Header -->
+          <tr>
+            <td style="padding:32px 40px 20px;text-align:center;border-bottom:1px solid #222222;">
+              {{panelLogo}}
+              <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">{{panelName}}</h1>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding:32px 40px;text-align:center;">
+              <div style="display:inline-block;width:64px;height:64px;background-color:#22c55e;border-radius:50%;line-height:64px;font-size:28px;color:#ffffff;margin-bottom:16px;">
+                &#10003;
+              </div>
+              <h2 style="margin:0 0 12px;font-size:20px;font-weight:600;color:#ffffff;">Email is working!</h2>
+              <p style="margin:0;font-size:15px;color:#a1a1a1;line-height:1.6;">
+                This is a test email from <strong style="color:#ffffff;">{{panelName}}</strong>. If you received this, your SMTP configuration is correct.
+              </p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 40px;border-top:1px solid #222222;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#555555;">
+                &copy; {{year}} {{panelName}}. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

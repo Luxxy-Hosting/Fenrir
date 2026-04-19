@@ -11,7 +11,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { CalagopusService } from '../pelican/pelican.service.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes } from 'crypto';
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -21,6 +21,8 @@ import {
 import type {
   AuthenticatorTransportFuture,
 } from '@simplewebauthn/server';
+import { MailService } from '../mail/mail.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 
 @Injectable()
 export class AuthService {
@@ -30,6 +32,8 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private calagopus: CalagopusService,
+    private mailService: MailService,
+    private settingsService: SettingsService,
   ) {}
 
   async register(dto: RegisterDto, ipAddress?: string, userAgent?: string) {
@@ -97,6 +101,22 @@ export class AuthService {
       },
     });
 
+    // Email verification
+    const emailVerifyEnabled = await this.settingsService.get('mail.verify_email');
+    if (emailVerifyEnabled === 'true') {
+      const emailToken = randomBytes(32).toString('hex');
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { emailToken },
+      });
+      await this.mailService.sendVerificationEmail(user.email, user.name || user.email, emailToken);
+    } else {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerified: true },
+      });
+    }
+
     const tokens = await this.generateTokens(user.id, user.email, user.role.name);
     await this.createSession(user.id, tokens.accessToken, tokens.refreshToken, ipAddress, userAgent);
 
@@ -111,6 +131,18 @@ export class AuthService {
       },
       ...tokens,
     };
+  }
+
+  async verifyEmail(token: string) {
+    const user = await this.prisma.user.findUnique({ where: { emailToken: token } });
+    if (!user) {
+      throw new BadRequestException('Invalid or expired verification token');
+    }
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true, emailToken: null },
+    });
+    return { message: 'Email verified successfully' };
   }
 
   async login(dto: LoginDto, ipAddress?: string, userAgent?: string) {
@@ -138,6 +170,9 @@ export class AuthService {
 
     const tokens = await this.generateTokens(user.id, user.email, user.role.name);
     await this.createSession(user.id, tokens.accessToken, tokens.refreshToken, ipAddress, userAgent);
+
+    // Send new login notification email
+    this.mailService.sendNewLoginEmail(user.email, user.name || user.email, ipAddress, userAgent).catch(() => {});
 
     return {
       user: {
@@ -476,6 +511,9 @@ export class AuthService {
     const user = passkey.user;
     const tokens = await this.generateTokens(user.id, user.email, user.role.name);
     await this.createSession(user.id, tokens.accessToken, tokens.refreshToken, ipAddress, userAgent);
+
+    // Send new login notification email
+    this.mailService.sendNewLoginEmail(user.email, user.name || user.email, ipAddress, userAgent).catch(() => {});
 
     return {
       user: {

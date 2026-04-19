@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState, useCallback } from "react";
+import { use, useEffect, useState, useCallback, useRef } from "react";
 import AuthenticationContext from "@/app/_context/authentication";
 import { api } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
@@ -9,6 +9,56 @@ import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Button } from "@workspace/ui/components/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
+
+function TestEmailButton() {
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleTest = async () => {
+    const token = getAccessToken();
+    if (!token || !email) return;
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await api.settings.testEmail(token, email);
+      if (res.success) {
+        setResult({ type: 'success', text: 'Test email sent successfully!' });
+      } else {
+        setResult({ type: 'error', text: res.error || 'Failed to send test email' });
+      }
+    } catch (err: any) {
+      setResult({ type: 'error', text: err.message });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-dashed p-4">
+      <Label className="font-medium">Send Test Email</Label>
+      <p className="text-xs text-muted-foreground">
+        Save your SMTP settings first, then send a test email to verify the configuration.
+      </p>
+      <div className="flex items-center gap-2">
+        <Input
+          placeholder="recipient@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="flex-1"
+        />
+        <Button onClick={handleTest} disabled={sending || !email} variant="outline" size="sm">
+          {sending ? "Sending..." : "Send Test"}
+        </Button>
+      </div>
+      {result && (
+        <p className={`text-xs ${result.type === 'success' ? 'text-emerald-500' : 'text-destructive'}`}>
+          {result.text}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function AdminSettingsPage() {
   const { user } = use(AuthenticationContext);
@@ -52,6 +102,9 @@ export default function AdminSettingsPage() {
       if (payload['openapi.key']?.endsWith('...')) {
         delete payload['openapi.key'];
       }
+      if (payload['mail.pass'] === '••••••••') {
+        delete payload['mail.pass'];
+      }
       await api.settings.update(token, payload);
       setMessage({ type: 'success', text: 'Settings saved successfully' });
     } catch (err: any) {
@@ -89,6 +142,7 @@ export default function AdminSettingsPage() {
           <TabsTrigger value="economy">Economy</TabsTrigger>
           <TabsTrigger value="openapi">OpenAPI</TabsTrigger>
           <TabsTrigger value="afk">AFK</TabsTrigger>
+          <TabsTrigger value="email">Email</TabsTrigger>
         </TabsList>
 
         <TabsContent value="panel" className="mt-4">
@@ -276,6 +330,129 @@ export default function AdminSettingsPage() {
                 <p><code>POST /api/openapi/v1/ban</code> — Ban a user</p>
                 <p><code>POST /api/openapi/v1/unban</code> — Unban a user</p>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="email" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Email (SMTP)</CardTitle>
+              <CardDescription>
+                Configure SMTP to send verification and login notification emails. All fields are required for email to work.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col gap-2 flex-1">
+                  <Label htmlFor="mail-enabled">Email Sending</Label>
+                  <select
+                    id="mail-enabled"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                    value={settings["mail.enabled"] || "false"}
+                    onChange={(e) => handleChange("mail.enabled", e.target.value)}
+                  >
+                    <option value="true">Enabled</option>
+                    <option value="false">Disabled</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2 flex-1">
+                  <Label htmlFor="mail-verify">Require Email Verification</Label>
+                  <select
+                    id="mail-verify"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                    value={settings["mail.verify_email"] || "false"}
+                    onChange={(e) => handleChange("mail.verify_email", e.target.value)}
+                  >
+                    <option value="true">Enabled</option>
+                    <option value="false">Disabled</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col gap-2 flex-1">
+                  <Label htmlFor="mail-login-notify">Login Notification Emails</Label>
+                  <select
+                    id="mail-login-notify"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                    value={settings["mail.login_notify"] || "true"}
+                    onChange={(e) => handleChange("mail.login_notify", e.target.value)}
+                  >
+                    <option value="true">Enabled</option>
+                    <option value="false">Disabled</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Sends an email when a new login/device is detected.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col gap-2 flex-1">
+                  <Label htmlFor="mail-host">SMTP Host</Label>
+                  <Input
+                    id="mail-host"
+                    placeholder="smtp.example.com"
+                    value={settings["mail.host"] || ""}
+                    onChange={(e) => handleChange("mail.host", e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-2 w-32">
+                  <Label htmlFor="mail-port">Port</Label>
+                  <Input
+                    id="mail-port"
+                    type="number"
+                    placeholder="587"
+                    value={settings["mail.port"] || ""}
+                    onChange={(e) => handleChange("mail.port", e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-2 w-32">
+                  <Label htmlFor="mail-secure">TLS/SSL</Label>
+                  <select
+                    id="mail-secure"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                    value={settings["mail.secure"] || "false"}
+                    onChange={(e) => handleChange("mail.secure", e.target.value)}
+                  >
+                    <option value="true">Yes (465)</option>
+                    <option value="false">No (587)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col gap-2 flex-1">
+                  <Label htmlFor="mail-user">SMTP Username</Label>
+                  <Input
+                    id="mail-user"
+                    placeholder="user@example.com"
+                    value={settings["mail.user"] || ""}
+                    onChange={(e) => handleChange("mail.user", e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-2 flex-1">
+                  <Label htmlFor="mail-pass">SMTP Password</Label>
+                  <Input
+                    id="mail-pass"
+                    type="password"
+                    placeholder="Enter SMTP password"
+                    value={settings["mail.pass"] || ""}
+                    onChange={(e) => handleChange("mail.pass", e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="mail-from">From Address</Label>
+                <Input
+                  id="mail-from"
+                  placeholder="noreply@example.com"
+                  value={settings["mail.from"] || ""}
+                  onChange={(e) => handleChange("mail.from", e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  The sender address shown in outgoing emails.
+                </p>
+              </div>
+              <TestEmailButton />
             </CardContent>
           </Card>
         </TabsContent>
