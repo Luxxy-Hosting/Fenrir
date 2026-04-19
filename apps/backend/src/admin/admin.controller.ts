@@ -231,6 +231,12 @@ export class AdminController {
     return this.adminService.setUserRole(id, roleId);
   }
 
+  @Post('users/:id/verify-email')
+  @Permissions('users.write')
+  forceVerifyEmail(@Param('id') id: string) {
+    return this.adminService.forceVerifyEmail(id);
+  }
+
   // ── Servers (admin) ──
 
   @Get('servers')

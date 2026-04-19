@@ -125,6 +125,7 @@ export default function AdminEggsPage() {
             <Field label="Max Disk (MB)" value={form.maxDisk} onChange={(v) => updateForm('maxDisk', parseInt(v) || 0)} type="number" />
             <Field label="Min CPU (%)" value={form.minCpu} onChange={(v) => updateForm('minCpu', parseInt(v) || 0)} type="number" />
             <Field label="Max CPU (%)" value={form.maxCpu} onChange={(v) => updateForm('maxCpu', parseInt(v) || 0)} type="number" />
+            <Field label="Image URL" value={form.logo} onChange={(v) => updateForm('logo', v)} />
             <Field label="Sort Order" value={form.sortOrder} onChange={(v) => updateForm('sortOrder', parseInt(v) || 0)} type="number" />
             <div className="md:col-span-2 lg:col-span-3 flex gap-2 justify-end">
               <Button variant="outline" onClick={cancel}><XIcon data-icon="inline-start" /> Cancel</Button>
@@ -134,35 +135,49 @@ export default function AdminEggsPage() {
         </Card>
       )}
 
-      <div className="flex flex-col gap-3">
-        {eggs.length === 0 && editing === null && (
-          <p className="text-muted-foreground text-center py-8">No eggs configured yet.</p>
-        )}
-        {eggs.map((egg) => (
-          <Card key={egg.id} className="group">
-            <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="font-medium">{egg.displayName}</p>
-                  <Badge variant="secondary">{egg.category}</Badge>
-                  <Badge variant="outline">{egg.remoteUuid.slice(0, 8)}...</Badge>
+      {eggs.length === 0 && editing === null && (
+        <p className="text-muted-foreground text-center py-8">No eggs configured yet.</p>
+      )}
+
+      {eggs.length > 0 && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border">
+              {eggs.map((egg) => (
+                <div key={egg.id} className="flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-3">
+                    {egg.logo ? (
+                      <img src={egg.logo} alt={egg.displayName} className="size-8 rounded-md object-contain" />
+                    ) : (
+                      <div className="flex size-8 items-center justify-center rounded-md bg-muted text-sm font-bold text-muted-foreground">
+                        {egg.displayName.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{egg.displayName}</p>
+                        <Badge variant="secondary">{egg.category}</Badge>
+                        <Badge variant="outline">{egg.remoteUuid.slice(0, 8)}...</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        RAM: {egg.minRam}–{egg.maxRam} MB · Disk: {egg.minDisk}–{egg.maxDisk} MB · CPU: {egg.minCpu}–{egg.maxCpu}%
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => startEdit(egg)} disabled={editing !== null}>
+                      <PencilIcon className="size-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => remove(egg.id)}>
+                      <TrashIcon className="size-4" />
+                    </Button>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  RAM: {egg.minRam}–{egg.maxRam} MB · Disk: {egg.minDisk}–{egg.maxDisk} MB · CPU: {egg.minCpu}–{egg.maxCpu}%
-                </p>
-              </div>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" onClick={() => startEdit(egg)} disabled={editing !== null}>
-                  <PencilIcon className="size-4" />
-                </Button>
-                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => remove(egg.id)}>
-                  <TrashIcon className="size-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

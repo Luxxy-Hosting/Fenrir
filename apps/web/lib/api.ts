@@ -430,6 +430,9 @@ export const api = {
     setUserRole: (token: string, id: string, roleId: string) =>
       request<any>(`/admin/users/${id}/role`, { method: 'PATCH', token, body: { roleId } }),
 
+    forceVerifyEmail: (token: string, id: string) =>
+      request<{ message: string }>(`/admin/users/${id}/verify-email`, { method: 'POST', token }),
+
     // Servers (admin)
     listAllServers: (token: string, page = 1) =>
       request<any>(`/admin/servers?page=${page}`, { token }),
@@ -622,6 +625,7 @@ export interface AdminUserDetail {
   email: string;
   name: string | null;
   avatar: string | null;
+  emailVerified: boolean;
   role: string;
   roleId: string;
   permissions: string[];

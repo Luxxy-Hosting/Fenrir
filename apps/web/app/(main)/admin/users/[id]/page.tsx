@@ -20,6 +20,7 @@ import {
   Loader2Icon,
   TrashIcon,
   SaveIcon,
+  MailCheckIcon,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -129,6 +130,20 @@ export default function AdminUserDetailPage() {
     }
   };
 
+  const handleForceVerify = async () => {
+    const token = getAccessToken();
+    if (!token || !detail) return;
+    try {
+      setActionLoading('verify');
+      await api.admin.forceVerifyEmail(token, detail.id);
+      load();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleDelete = async () => {
     if (!detail) return;
     if (!confirm(`Permanently delete user "${detail.name || detail.email}"? This cannot be undone.`)) return;
@@ -172,14 +187,27 @@ export default function AdminUserDetailPage() {
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-semibold">{detail.name || detail.email}</h1>
-          <p className="text-muted-foreground text-sm">{detail.email} · Joined {new Date(detail.createdAt).toLocaleDateString()}</p>
+          <p className="text-muted-foreground text-sm">
+            {detail.email} · Joined {new Date(detail.createdAt).toLocaleDateString()}
+            {!detail.emailVerified && (
+              <Badge variant="destructive" className="ml-2 text-[10px]">Unverified</Badge>
+            )}
+          </p>
         </div>
-        {hasPermission('users.delete') && !isSelf && (
-          <Button variant="destructive" size="sm" onClick={handleDelete} disabled={actionLoading === 'delete'}>
-            {actionLoading === 'delete' ? <Loader2Icon className="size-4 animate-spin mr-1" /> : <TrashIcon className="size-4 mr-1" />}
-            Delete User
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {hasPermission('users.write') && !detail.emailVerified && (
+            <Button variant="outline" size="sm" onClick={handleForceVerify} disabled={actionLoading === 'verify'}>
+              {actionLoading === 'verify' ? <Loader2Icon className="size-4 animate-spin mr-1" /> : <MailCheckIcon className="size-4 mr-1" />}
+              Force Verify
+            </Button>
+          )}
+          {hasPermission('users.delete') && !isSelf && (
+            <Button variant="destructive" size="sm" onClick={handleDelete} disabled={actionLoading === 'delete'}>
+              {actionLoading === 'delete' ? <Loader2Icon className="size-4 animate-spin mr-1" /> : <TrashIcon className="size-4 mr-1" />}
+              Delete User
+            </Button>
+          )}
+        </div>
       </div>
 
       {error && (

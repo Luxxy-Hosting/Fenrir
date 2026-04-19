@@ -510,6 +510,7 @@ export class AdminService {
       email: user.email,
       name: user.name,
       avatar: user.avatar,
+      emailVerified: user.emailVerified,
       role: user.role.name,
       roleId: user.roleId,
       permissions: user.role.permissions.map((rp) => rp.permission.name),
@@ -540,6 +541,16 @@ export class AdminService {
     const role = await this.prisma.role.findUnique({ where: { id: roleId } });
     if (!role) throw new NotFoundException('Role not found');
     return this.prisma.user.update({ where: { id: userId }, data: { roleId } });
+  }
+
+  async forceVerifyEmail(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { emailVerified: true, emailToken: null },
+    });
+    return { message: 'Email verified' };
   }
 
   // ── Server management (admin) ──

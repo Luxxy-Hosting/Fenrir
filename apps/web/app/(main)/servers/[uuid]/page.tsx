@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, type EggConfig } from '@/lib/api';
 import Editor from '@monaco-editor/react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -172,16 +172,27 @@ export default function ServerDetailPage() {
   const [activities, setActivities] = useState<any[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
 
+  // Egg logo
+  const [eggLogo, setEggLogo] = useState<string | null>(null);
+
   const token = getAccessToken();
 
   // Load server details
   const loadServer = useCallback(async () => {
     if (!token) return;
     try {
-      const data = await api.servers.get(token, uuid);
+      const [data, eggsData] = await Promise.all([
+        api.servers.get(token, uuid),
+        api.servers.eggs(token),
+      ]);
       setServer(data.server);
       setResources(data.resources);
       setRenameValue(data.server?.name || '');
+      const eggUuid = data.server?.egg?.uuid;
+      if (eggUuid && eggsData) {
+        const match = eggsData.find((e: EggConfig) => e.remoteUuid === eggUuid);
+        if (match?.logo) setEggLogo(match.logo);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -736,6 +747,9 @@ export default function ServerDetailPage() {
         </Button>
         <div className="flex items-center gap-3">
           <div className={`size-3 rounded-full ${statusColor}`} />
+          {eggLogo && (
+            <img src={eggLogo} alt="" className="size-6 rounded object-contain" />
+          )}
           <div>
             <h1 className="text-xl font-bold">{server?.name}</h1>
             <p className="text-xs text-muted-foreground">{server?.uuid_short || uuid.substring(0, 8)}</p>

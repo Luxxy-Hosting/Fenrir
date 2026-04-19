@@ -4,6 +4,7 @@ import type { Transporter } from 'nodemailer';
 import { SettingsService } from '../settings/settings.service.js';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as dns from 'dns';
 
 @Injectable()
 export class MailService {
@@ -23,15 +24,26 @@ export class MailService {
     if (config['mail.enabled'] !== 'true') return null;
     if (!config['mail.host'] || !config['mail.user']) return null;
 
+    // Resolve hostname to IPv4 to avoid ENETUNREACH on IPv6-only DNS
+    let host = config['mail.host']!;
+    try {
+      const { address } = await dns.promises.lookup(host, { family: 4 });
+      host = address;
+    } catch { /* fallback to original hostname */ }
+
     return nodemailer.createTransport({
-      host: config['mail.host'],
+      host,
       port: parseInt(config['mail.port'] || '587', 10),
       secure: config['mail.secure'] === 'true',
       auth: {
         user: config['mail.user'],
         pass: config['mail.pass'] || '',
       },
-    });
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+      tls: { servername: config['mail.host'] },
+    } as any);
   }
 
   private async getBrand(): Promise<{ name: string; logo: string; url: string }> {

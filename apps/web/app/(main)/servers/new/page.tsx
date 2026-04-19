@@ -199,7 +199,7 @@ export default function CreateServerPage() {
                     {catEggs.map((egg) => (
                       <button
                         key={egg.id}
-                        className={`flex flex-col items-center gap-1 rounded-lg border p-3 text-sm transition hover:border-primary/50 ${
+                        className={`flex flex-col items-center gap-2 rounded-lg border p-4 text-sm transition hover:border-primary/50 ${
                           selectedEgg === egg.id ? 'border-primary bg-primary/5' : ''
                         }`}
                         onClick={() => {
@@ -210,6 +210,17 @@ export default function CreateServerPage() {
                           initEnvDefaults(egg);
                         }}
                       >
+                        {egg.logo ? (
+                          <img
+                            src={egg.logo}
+                            alt={egg.displayName}
+                            className="size-10 rounded-md object-contain"
+                          />
+                        ) : (
+                          <div className="flex size-10 items-center justify-center rounded-md bg-muted text-lg font-bold text-muted-foreground">
+                            {egg.displayName.charAt(0)}
+                          </div>
+                        )}
                         <span className="font-medium">{egg.displayName}</span>
                       </button>
                     ))}

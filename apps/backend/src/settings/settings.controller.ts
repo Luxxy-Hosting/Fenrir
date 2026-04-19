@@ -60,7 +60,12 @@ export class SettingsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   async setMany(@Body() body: Record<string, string>) {
-    await this.settingsService.setMany(body);
+    const payload = { ...body };
+    // Never overwrite secrets with masked placeholders
+    if (payload['panel.apiKey']?.endsWith('...')) delete payload['panel.apiKey'];
+    if (payload['openapi.key']?.endsWith('...')) delete payload['openapi.key'];
+    if (payload['mail.pass'] === '••••••••' || payload['mail.pass'] === '********') delete payload['mail.pass'];
+    await this.settingsService.setMany(payload);
     return { message: 'Settings updated' };
   }
 

@@ -2,7 +2,7 @@
 
 import { use, useCallback, useEffect, useRef, useState } from 'react';
 import AuthenticationContext from '@/app/_context/authentication';
-import { api, type ServerItem, type ResourceUsage } from '@/lib/api';
+import { api, type ServerItem, type ResourceUsage, type EggConfig } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 import { Card, CardContent } from '@workspace/ui/components/card';
 import { Button } from '@workspace/ui/components/button';
@@ -31,9 +31,10 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1048576).toFixed(0)} MB`;
 }
 
-function ServerCard({ server, liveStats }: {
+function ServerCard({ server, liveStats, eggLogo }: {
   server: ServerItem;
   liveStats: LiveStats | null;
+  eggLogo?: string | null;
 }) {
   const state = liveStats?.state ?? server.status ?? 'offline';
   const statusColor = server.suspended ? 'bg-destructive' :
@@ -58,7 +59,11 @@ function ServerCard({ server, liveStats }: {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className={`size-2.5 rounded-full ${statusColor} ${state === 'running' ? 'animate-pulse' : ''}`} />
-              <ServerIcon className="size-5 text-muted-foreground" />
+              {eggLogo ? (
+                <img src={eggLogo} alt="" className="size-5 rounded object-contain" />
+              ) : (
+                <ServerIcon className="size-5 text-muted-foreground" />
+              )}
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -105,15 +110,20 @@ export default function ServersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [liveStats, setLiveStats] = useState<Record<string, LiveStats>>({});
+  const [eggs, setEggs] = useState<EggConfig[]>([]);
   const socketsRef = useRef<Map<string, WebSocket>>(new Map());
 
   const loadServers = useCallback(async () => {
     const token = getAccessToken();
     if (!token) return;
     try {
-      const data = await api.servers.list(token);
+      const [data, eggsData] = await Promise.all([
+        api.servers.list(token),
+        api.servers.eggs(token),
+      ]);
       setServers(data.servers);
       setResources(data.resources);
+      setEggs(eggsData);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -236,6 +246,7 @@ export default function ServersPage() {
               key={server.uuid}
               server={server}
               liveStats={liveStats[server.uuid] || null}
+              eggLogo={eggs.find(e => e.remoteUuid === server.egg?.uuid)?.logo}
             />
           ))}
         </div>
