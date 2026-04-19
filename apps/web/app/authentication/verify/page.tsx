@@ -4,8 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+import { getApiUrl } from "@/lib/env";
 
 export default function VerifyEmailPage() {
   return (
@@ -32,7 +31,7 @@ function VerifyEmailContent() {
       return;
     }
 
-    fetch(`${API_BASE}/auth/verify-email?token=${encodeURIComponent(token)}`)
+    fetch(`${getApiUrl()}/auth/verify-email?token=${encodeURIComponent(token)}`)
       .then(async (res) => {
         const data = await res.json();
         if (res.ok) {

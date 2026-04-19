@@ -313,12 +313,12 @@ export default function AdminSettingsPage() {
               </div>
               <div className="flex items-center gap-3">
                 <Button variant="outline" size="sm" asChild>
-                  <a href={(process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/\/api$/, "") + "/api/docs"} target="_blank" rel="noopener noreferrer">
+                  <a href={((typeof window !== 'undefined' ? ((window as any).__ENV__?.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL) : process.env.NEXT_PUBLIC_API_URL) || "http://localhost:3001/api").replace(/\/api$/, "") + "/api/docs"} target="_blank" rel="noopener noreferrer">
                     Open Swagger UI
                   </a>
                 </Button>
                 <Button variant="outline" size="sm" asChild>
-                  <a href={(process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/\/api$/, "") + "/api/docs-json"} target="_blank" rel="noopener noreferrer">
+                  <a href={((typeof window !== 'undefined' ? ((window as any).__ENV__?.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL) : process.env.NEXT_PUBLIC_API_URL) || "http://localhost:3001/api").replace(/\/api$/, "") + "/api/docs-json"} target="_blank" rel="noopener noreferrer">
                     Download openapi.json
                   </a>
                 </Button>

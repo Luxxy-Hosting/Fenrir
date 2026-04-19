@@ -187,7 +187,7 @@ function BrandHeader({ brand }: { brand: BrandConfig }) {
 function getAvatarUrl(avatar: string | null | undefined) {
   if (!avatar) return null;
   if (avatar.startsWith('http')) return avatar;
-  const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/\/api$/, '');
+  const base = (typeof window !== 'undefined' ? ((window as any).__ENV__?.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api') : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api')).replace(/\/api$/, '');
   return `${base}${avatar}`;
 }
 

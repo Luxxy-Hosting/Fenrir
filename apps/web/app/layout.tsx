@@ -24,12 +24,18 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+  const envScript = `window.__ENV__=${JSON.stringify({ NEXT_PUBLIC_API_URL: apiUrl })};`;
+
   return (
     <html
       lang="en"
       suppressHydrationWarning
       className={cn("antialiased", fontMono.variable, "font-sans", geist.variable)}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: envScript }} />
+      </head>
       <body className="h-svh overflow-hidden">
         <ThemeProvider>
           <TooltipProvider>

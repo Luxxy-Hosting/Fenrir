@@ -192,7 +192,7 @@ export default function ProfilePage() {
     }
   };
 
-  const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/\/api$/, '');
+  const apiBase = typeof window !== 'undefined' ? ((window as any).__ENV__?.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/\/api$/, '') : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/\/api$/, '');
   const rawAvatar = avatarPreview || user?.avatar;
   const avatarSrc = rawAvatar && !rawAvatar.startsWith('blob:') && !rawAvatar.startsWith('http') ? `${apiBase}${rawAvatar}` : rawAvatar;
   const initials = (user?.name || user?.email || 'U').charAt(0).toUpperCase();

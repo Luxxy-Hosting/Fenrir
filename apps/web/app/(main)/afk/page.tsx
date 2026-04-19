@@ -81,7 +81,8 @@ export default function AfkPage() {
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const backendHost = process.env.NEXT_PUBLIC_API_URL?.replace(/^https?:\/\//, '').replace(/\/api$/, '') || 'localhost:3001';
+    const runtimeApiUrl = (window as any).__ENV__?.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+    const backendHost = runtimeApiUrl.replace(/^https?:\/\//, '').replace(/\/api$/, '');
     const ws = new WebSocket(`${protocol}//${backendHost}/api/afk/ws?token=${token}`);
     wsRef.current = ws;
 
