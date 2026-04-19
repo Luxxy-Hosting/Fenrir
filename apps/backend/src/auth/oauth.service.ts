@@ -35,7 +35,7 @@ export class OAuthService {
         });
       }
 
-      user = await this.prisma.user.create({
+      user = await (this.prisma.user.create as any)({
         data: {
           email,
           name,
@@ -46,6 +46,8 @@ export class OAuthService {
         include: { role: true },
       });
 
+      if (!user) throw new Error('Failed to create user');
+
       // Create Calagopus user
       try {
         const calagopusUser = await this.calagopus.createUser({
@@ -54,7 +56,13 @@ export class OAuthService {
           password: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
         });
         const cid = calagopusUser?.attributes?.uuid || calagopusUser?.attributes?.id?.toString();
-        if (cid) await this.prisma.user.update({ where: { id: user.id }, data: { calagopusId: cid } });
+        if (cid) {
+          await this.prisma.userResources.upsert({
+            where: { userId: user.id },
+            create: { userId: user.id, calagopusId: cid } as any,
+            update: { calagopusId: cid } as any,
+          });
+        }
       } catch { /* non-fatal */ }
     }
 
