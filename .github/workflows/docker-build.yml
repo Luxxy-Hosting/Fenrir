@@ -69,7 +69,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.WORKFLOWS_TOKEN }}
 
       - name: Docker metadata
         id: meta
