@@ -1,14 +1,14 @@
 'use client';
 
 import { use, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Input } from '@workspace/ui/components/input';
 import { Label } from '@workspace/ui/components/label';
 import { Button } from '@workspace/ui/components/button';
 import { Alert, AlertDescription } from '@workspace/ui/components/alert';
 import { Separator } from '@workspace/ui/components/separator';
-import { AlertCircleIcon, EyeIcon, EyeOffIcon, KeyRoundIcon, Loader2Icon } from 'lucide-react';
+import { AlertCircleIcon, EyeIcon, EyeOffIcon, KeyRoundIcon, Loader2Icon, ShieldIcon } from 'lucide-react';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@workspace/ui/components/input-otp';
 import AuthenticationContext from '@/app/_context/authentication';
 import { api, type BrandConfig } from '@/lib/api';
 import { cachedFetch } from '@/lib/cache';
@@ -17,8 +17,7 @@ import { startAuthentication } from '@simplewebauthn/browser';
 import { getApiBase } from '@/lib/env';
 
 export default function LoginPage() {
-  const { login } = use(AuthenticationContext);
-  const router = useRouter();
+  use(AuthenticationContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -27,6 +26,8 @@ export default function LoginPage() {
   const [brand, setBrand] = useState<BrandConfig>({});
   const [oauth, setOauth] = useState<{ discord: boolean; google: boolean; github: boolean }>({ discord: false, google: false, github: false });
   const [oauthError, setOauthError] = useState('');
+  const [challengeToken, setChallengeToken] = useState('');
+  const [otpCode, setOtpCode] = useState('');
 
   useEffect(() => {
     cachedFetch('brand', () => api.settings.getBrand(), 5 * 60 * 1000)
@@ -51,10 +52,31 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
-      router.replace('/');
+      const res = await api.auth.login({ email, password });
+      if (res.require2fa && res.challengeToken) {
+        setChallengeToken(res.challengeToken);
+      } else {
+        setTokens(res.accessToken, res.refreshToken);
+        window.location.href = '/';
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handle2FA(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const res = await api.auth.twofa.verify(challengeToken, otpCode);
+      setTokens(res.accessToken, res.refreshToken);
+      window.location.href = '/';
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Invalid code');
+      setOtpCode('');
     } finally {
       setLoading(false);
     }
@@ -99,6 +121,36 @@ export default function LoginPage() {
         </Alert>
       )}
 
+      {challengeToken ? (
+        <form onSubmit={handle2FA} className="w-full flex flex-col items-center gap-6">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <ShieldIcon className="size-8 text-orange-500" />
+            <p className="text-sm text-muted-foreground">Enter the 6-digit code from your authenticator app</p>
+          </div>
+          <InputOTP maxLength={6} value={otpCode} onChange={setOtpCode}>
+            <InputOTPGroup>
+              <InputOTPSlot index={0} />
+              <InputOTPSlot index={1} />
+              <InputOTPSlot index={2} />
+              <InputOTPSlot index={3} />
+              <InputOTPSlot index={4} />
+              <InputOTPSlot index={5} />
+            </InputOTPGroup>
+          </InputOTP>
+          <Button
+            type="submit"
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold"
+            disabled={loading || otpCode.length < 6}
+          >
+            {loading && <Loader2Icon className="size-4 animate-spin" />}
+            Verify
+          </Button>
+          <button type="button" className="text-xs text-muted-foreground underline" onClick={() => setChallengeToken('')}>
+            Back to login
+          </button>
+        </form>
+      ) : (
+      <>
       <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="email">Email address</Label>
@@ -210,6 +262,8 @@ export default function LoginPage() {
           Sign up
         </Link>
       </p>
+      </>
+      )}
     </div>
   );
 }

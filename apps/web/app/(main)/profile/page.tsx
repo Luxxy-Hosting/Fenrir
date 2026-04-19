@@ -93,6 +93,13 @@ export default function ProfilePage() {
   const [oauthConfig, setOauthConfig] = useState<{ discord: boolean; google: boolean; github: boolean }>({ discord: false, google: false, github: false });
   const [oauthMsg, setOauthMsg] = useState('');
 
+  // 2FA
+  const [twoFaEnabled, setTwoFaEnabled] = useState(false);
+  const [twoFaSetup, setTwoFaSetup] = useState<{ secret: string; qrCode: string } | null>(null);
+  const [twoFaCode, setTwoFaCode] = useState('');
+  const [twoFaLoading, setTwoFaLoading] = useState(false);
+  const [twoFaMsg, setTwoFaMsg] = useState('');
+
   useEffect(() => {
     if (user?.name) setName(user.name);
   }, [user?.name]);
@@ -148,12 +155,22 @@ export default function ProfilePage() {
     if (linked || linkError) window.history.replaceState({}, '', '/profile');
   }, []);
 
+  const load2FA = useCallback(async () => {
+    const token = getAccessToken();
+    if (!token) return;
+    try {
+      const data = await api.auth.twofa.status(token);
+      setTwoFaEnabled(data.enabled);
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     loadPasskeys();
     loadPanelAccount();
     loadSessions();
     loadLinkedAccounts();
-  }, [loadPasskeys, loadPanelAccount, loadSessions, loadLinkedAccounts]);
+    load2FA();
+  }, [loadPasskeys, loadPanelAccount, loadSessions, loadLinkedAccounts, load2FA]);
 
   const handleSaveProfile = async () => {
     const token = getAccessToken();
@@ -394,6 +411,119 @@ export default function ProfilePage() {
 
         {/* Right column */}
         <div className="flex flex-col gap-6">
+          {/* Two-Factor Authentication */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldIcon className="size-5" /> Two-Factor Authentication
+              </CardTitle>
+              <CardDescription>
+                {twoFaEnabled ? 'Your account is protected with 2FA.' : 'Add an extra layer of security using an authenticator app.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {twoFaMsg && <p className="text-sm text-green-500">{twoFaMsg}</p>}
+              {twoFaEnabled ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-green-500">
+                    <ShieldIcon className="size-4" /> 2FA is enabled
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Enter your current authenticator code to disable 2FA:</p>
+                    <div className="flex gap-2">
+                      <input
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        placeholder="6-digit code"
+                        maxLength={6}
+                        value={twoFaCode}
+                        onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, ''))}
+                      />
+                      <Button
+                        variant="destructive"
+                        disabled={twoFaLoading || twoFaCode.length < 6}
+                        onClick={async () => {
+                          const token = getAccessToken();
+                          if (!token) return;
+                          setTwoFaLoading(true);
+                          try {
+                            await api.auth.twofa.disable(token, twoFaCode);
+                            setTwoFaEnabled(false);
+                            setTwoFaCode('');
+                            setTwoFaMsg('2FA disabled.');
+                          } catch (e: any) {
+                            setTwoFaMsg(e.message || 'Invalid code');
+                          } finally { setTwoFaLoading(false); }
+                        }}
+                      >
+                        {twoFaLoading ? <Loader2Icon className="size-4 animate-spin" /> : 'Disable'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : twoFaSetup ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">Scan this QR code with your authenticator app (e.g. Google Authenticator, Authy):</p>
+                  <img src={twoFaSetup.qrCode} alt="2FA QR Code" className="w-40 h-40 rounded border" />
+                  <div className="text-xs text-muted-foreground">
+                    Or enter manually: <code className="font-mono bg-muted px-1 rounded">{twoFaSetup.secret}</code>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Enter the 6-digit code from your app to confirm:</p>
+                    <div className="flex gap-2">
+                      <input
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        placeholder="6-digit code"
+                        maxLength={6}
+                        value={twoFaCode}
+                        onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, ''))}
+                      />
+                      <Button
+                        disabled={twoFaLoading || twoFaCode.length < 6}
+                        className="bg-orange-500 hover:bg-orange-600 text-white"
+                        onClick={async () => {
+                          const token = getAccessToken();
+                          if (!token) return;
+                          setTwoFaLoading(true);
+                          try {
+                            await api.auth.twofa.enable(token, twoFaCode);
+                            setTwoFaEnabled(true);
+                            setTwoFaSetup(null);
+                            setTwoFaCode('');
+                            setTwoFaMsg('2FA enabled successfully.');
+                          } catch (e: any) {
+                            setTwoFaMsg(e.message || 'Invalid code');
+                          } finally { setTwoFaLoading(false); }
+                        }}
+                      >
+                        {twoFaLoading ? <Loader2Icon className="size-4 animate-spin" /> : 'Verify & Enable'}
+                      </Button>
+                    </div>
+                  </div>
+                  <button className="text-xs text-muted-foreground underline" onClick={() => { setTwoFaSetup(null); setTwoFaCode(''); }}>Cancel</button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  disabled={twoFaLoading}
+                  onClick={async () => {
+                    const token = getAccessToken();
+                    if (!token) return;
+                    setTwoFaLoading(true);
+                    try {
+                      const data = await api.auth.twofa.setup(token);
+                      setTwoFaSetup(data);
+                      setTwoFaMsg('');
+                    } catch (e: any) {
+                      setTwoFaMsg(e.message || 'Failed to start 2FA setup');
+                    } finally { setTwoFaLoading(false); }
+                  }}
+                >
+                  {twoFaLoading ? <Loader2Icon className="size-4 animate-spin" /> : 'Set up 2FA'}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Passkeys */}
           <Card>
             <CardHeader>

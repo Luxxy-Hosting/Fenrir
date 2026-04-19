@@ -168,6 +168,14 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (user.totpEnabled) {
+      const challengeToken = this.jwtService.sign(
+        { sub: user.id, require2fa: true },
+        { expiresIn: '10m' },
+      );
+      return { require2fa: true, challengeToken };
+    }
+
     const tokens = await this.generateTokens(user.id, user.email, user.role.name);
     await this.createSession(user.id, tokens.accessToken, tokens.refreshToken, ipAddress, userAgent);
 
@@ -224,6 +232,28 @@ export class AuthService {
       },
     });
 
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        avatar: user.avatar,
+        role: user.role.name,
+        permissions: user.role.permissions.map((rp) => rp.permission.name),
+      },
+      ...tokens,
+    };
+  }
+
+  async completeLogin(userId: string, ipAddress?: string, userAgent?: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: { include: { permissions: { include: { permission: true } } } } },
+    });
+    if (!user) throw new UnauthorizedException('User not found');
+    const tokens = await this.generateTokens(user.id, user.email, user.role.name);
+    await this.createSession(user.id, tokens.accessToken, tokens.refreshToken, ipAddress, userAgent);
+    this.mailService.sendNewLoginEmail(user.email, user.name || user.email, ipAddress, userAgent).catch(() => {});
     return {
       user: {
         id: user.id,

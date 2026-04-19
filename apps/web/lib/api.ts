@@ -111,7 +111,20 @@ export const api = {
       request<AuthResponse>('/auth/register', { method: 'POST', body: data }),
 
     login: (data: { email: string; password: string }) =>
-      request<AuthResponse>('/auth/login', { method: 'POST', body: data }),
+      request<AuthResponse & { require2fa?: boolean; challengeToken?: string }>('/auth/login', { method: 'POST', body: data }),
+
+    twofa: {
+      status: (token: string) =>
+        request<{ enabled: boolean }>('/auth/2fa/status', { token }),
+      setup: (token: string) =>
+        request<{ secret: string; qrCode: string }>('/auth/2fa/setup', { method: 'POST', token }),
+      enable: (token: string, code: string) =>
+        request<{ message: string }>('/auth/2fa/enable', { method: 'POST', token, body: { code } }),
+      disable: (token: string, code: string) =>
+        request<{ message: string }>('/auth/2fa/disable', { method: 'POST', token, body: { code } }),
+      verify: (challengeToken: string, code: string) =>
+        request<AuthResponse>('/auth/2fa/verify', { method: 'POST', body: { challengeToken, code } }),
+    },
 
     refresh: (refreshToken: string) =>
       request<AuthResponse>('/auth/refresh', { method: 'POST', body: { refreshToken } }),
@@ -440,6 +453,8 @@ export const api = {
 
     forceVerifyEmail: (token: string, id: string) =>
       request<{ message: string }>(`/admin/users/${id}/verify-email`, { method: 'POST', token }),
+    setUserPanelId: (token: string, id: string, calagopusId: string) =>
+      request<any>(`/admin/users/${id}/panel-id`, { method: 'PATCH', token, body: { calagopusId } }),
 
     // Servers (admin)
     listAllServers: (token: string, page = 1) =>

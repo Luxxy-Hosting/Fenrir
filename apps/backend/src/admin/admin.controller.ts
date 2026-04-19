@@ -237,6 +237,12 @@ export class AdminController {
     return this.adminService.forceVerifyEmail(id);
   }
 
+  @Patch('users/:id/panel-id')
+  @Permissions('users.write')
+  setUserPanelId(@Param('id') id: string, @Body('calagopusId') calagopusId: string) {
+    return this.adminService.updateUserResources(id, { calagopusId });
+  }
+
   // ── Servers (admin) ──
 
   @Get('servers')

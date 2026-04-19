@@ -26,6 +26,8 @@ model User {
   passkeys       Passkey[]
   oauthAccounts  OAuthAccount[]
   resources      UserResources?
+  totpSecret     String?
+  totpEnabled    Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }

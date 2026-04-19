@@ -29,6 +29,14 @@ export function StatusFooter() {
   return (
     <footer className="shrink-0 border-t px-4 py-1.5 flex items-center justify-between text-[10px] text-muted-foreground/50 select-none">
       <span>{VERSION}</span>
+      <a
+        href="https://github.com/luxdotdev/fenrir"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hover:text-muted-foreground transition-colors"
+      >
+        Powered by Fenrir
+      </a>
       <span>cache: {cacheTime}</span>
     </footer>
   );

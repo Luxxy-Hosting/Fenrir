@@ -5,6 +5,8 @@ import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';
 import { OAuthController } from './oauth.controller.js';
 import { OAuthService } from './oauth.service.js';
+import { TotpController } from './totp.controller.js';
+import { TotpService } from './totp.service.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
 import { CalagopusModule } from '../pelican/pelican.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
@@ -19,8 +21,8 @@ import { SettingsModule } from '../settings/settings.module.js';
     CalagopusModule,
     SettingsModule,
   ],
-  controllers: [AuthController, OAuthController],
-  providers: [AuthService, OAuthService, JwtStrategy],
+  controllers: [AuthController, OAuthController, TotpController],
+  providers: [AuthService, OAuthService, TotpService, JwtStrategy],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

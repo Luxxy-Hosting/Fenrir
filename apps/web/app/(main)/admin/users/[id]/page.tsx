@@ -21,6 +21,7 @@ import {
   TrashIcon,
   SaveIcon,
   MailCheckIcon,
+  LinkIcon,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -43,6 +44,7 @@ export default function AdminUserDetailPage() {
     extraCpu: 0,
     extraServers: 0,
   });
+  const [editPanelId, setEditPanelId] = useState('');
 
   const load = useCallback(async () => {
     const token = getAccessToken();
@@ -57,6 +59,7 @@ export default function AdminUserDetailPage() {
       ]);
       setDetail(userData);
       setEditCoins(String(userData.resources?.coins ?? 0));
+      setEditPanelId(userData.resources?.calagopusId ?? '');
       setEditResources({
         extraRam: userData.resources?.extraRam ?? 0,
         extraDisk: userData.resources?.extraDisk ?? 0,
@@ -122,6 +125,21 @@ export default function AdminUserDetailPage() {
     try {
       setActionLoading('package');
       await api.admin.setUserPackage(token, detail.id, packageId);
+      load();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSetPanelId = async () => {
+    const token = getAccessToken();
+    if (!token || !detail) return;
+    if (!editPanelId.trim()) return;
+    try {
+      setActionLoading('panelId');
+      await api.admin.setUserPanelId(token, detail.id, editPanelId.trim());
       load();
     } catch (err: any) {
       setError(err.message);
@@ -237,14 +255,6 @@ export default function AdminUserDetailPage() {
               ))}
             </div>
             {isSelf && <p className="text-xs text-muted-foreground mt-2">Cannot change your own role</p>}
-            <div className="mt-3">
-              <p className="text-xs text-muted-foreground mb-1">Current permissions:</p>
-              <div className="flex flex-wrap gap-1">
-                {detail.permissions.map((p) => (
-                  <Badge key={p} variant="outline" className="text-[10px]">{p}</Badge>
-                ))}
-              </div>
-            </div>
           </CardContent>
         </Card>
 
@@ -352,6 +362,32 @@ export default function AdminUserDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Panel Account ID */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base"><LinkIcon className="size-4" /> Panel Account ID</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Calagopus UUID (e.g. abc123...)"
+              value={editPanelId}
+              onChange={(e) => setEditPanelId(e.target.value)}
+              className="font-mono text-xs"
+            />
+            <Button size="sm" onClick={handleSetPanelId} disabled={actionLoading === 'panelId' || !editPanelId.trim()}>
+              {actionLoading === 'panelId' ? <Loader2Icon className="size-4 animate-spin mr-1" /> : <SaveIcon className="size-4 mr-1" />}
+              Save
+            </Button>
+          </div>
+          {detail.resources?.calagopusId && (
+            <p className="text-xs text-muted-foreground">
+              Current: <code className="font-mono bg-muted px-1 rounded">{detail.resources.calagopusId}</code>
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <Separator />
 
