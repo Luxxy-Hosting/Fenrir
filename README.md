@@ -6,7 +6,7 @@
 
 # Fenrir Panel
 
-A modern game server management panel built with **Next.js** and **NestJS**, designed to work with [Calagopus](https://calagopus.com) (Pelican/Pterodactyl).
+A modern game server management panel built with **Next.js** and **NestJS**, designed to work with [Calagopus](https://calagopus.com)
 
 ## Features
 
@@ -22,9 +22,7 @@ A modern game server management panel built with **Next.js** and **NestJS**, des
 - **Admin Panel** — Manage users, servers, eggs, locations, roles, packages, and settings
 - **Email System** — SMTP email support with verification, login notifications, and test emails
 - **Passkey Authentication** — WebAuthn/FIDO2 passwordless login support
-- **API Documentation** — Auto-generated Swagger UI at `/api/docs`
 - **Dark Mode** — Modern dark UI built with Tailwind CSS and shadcn/ui
-- **Docker Ready** — Pre-built images on GHCR, deploy in minutes
 
 ## Tech Stack
 
