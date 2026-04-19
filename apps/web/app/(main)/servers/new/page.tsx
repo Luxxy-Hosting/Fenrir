@@ -49,6 +49,15 @@ export default function CreateServerPage() {
   const [envOverrides, setEnvOverrides] = useState<Record<string, string>>({});
   const [selectedImage, setSelectedImage] = useState('');
 
+  // Minecraft version picker
+  const [mcjarTypes, setMcjarTypes] = useState<Record<string, any>>({});
+  const [selectedMcType, setSelectedMcType] = useState('');
+  const [mcVersions, setMcVersions] = useState<string[]>([]);
+  const [selectedMcVersion, setSelectedMcVersion] = useState('');
+  const [mcBuilds, setMcBuilds] = useState<any[]>([]);
+  const [selectedMcBuild, setSelectedMcBuild] = useState('');
+  const [mcLoading, setMcLoading] = useState(false);
+
   const loadData = useCallback(async () => {
     const token = getAccessToken();
     if (!token) return;
@@ -80,6 +89,7 @@ export default function CreateServerPage() {
   }, [loadData]);
 
   const currentEgg = eggs.find((e) => e.id === selectedEgg);
+  const isMinecraftEgg = currentEgg?.category?.toLowerCase() === 'minecraft';
 
   const initEnvDefaults = (egg: EggConfig) => {
     const defaults: Record<string, string> = {};
@@ -99,6 +109,96 @@ export default function CreateServerPage() {
   const editableVars = Array.isArray(currentEgg?.environment)
     ? currentEgg.environment.filter((v) => v.user_editable && v.user_viewable)
     : [];
+
+  const allVars = Array.isArray(currentEgg?.environment) ? currentEgg.environment : [];
+
+  // Find egg env vars that represent MC version, build number, or jar/download URL
+  // Search all vars (including non-editable) so we can detect and fill them
+  const mcVersionVar = allVars.find((v) =>
+    /version/i.test(v.name) && !/build/i.test(v.name) && !/url|jar|download/i.test(v.name)
+  );
+  const mcBuildVar = allVars.find((v) => /build/i.test(v.name) && !/url|jar|download/i.test(v.name));
+  // DL_PATH / DOWNLOAD_URL etc — the URL to download the jar from
+  const mcJarVar = allVars.find((v) =>
+    /download.*path|download.*url/i.test(v.name) ||
+    /DL_PATH|DOWNLOAD_URL|JAR_URL/i.test(v.env_variable)
+  );
+  // SERVER_JARFILE — the filename to save the jar as (e.g. "server.jar")
+  const mcJarFileVar = allVars.find((v) =>
+    /SERVER_JARFILE/i.test(v.env_variable) || /server.*jar.*file|jar.*file/i.test(v.name)
+  );
+
+  // Fetch mcjars types when a Minecraft egg is selected
+  useEffect(() => {
+    if (!isMinecraftEgg) { setMcjarTypes({}); setSelectedMcType(''); return; }
+    fetch('https://mcjars.app/api/v2/types')
+      .then((r) => r.json())
+      .then((d) => {
+        const all: Record<string, any> = {};
+        for (const group of Object.values(d.types || d)) {
+          if (typeof group === 'object' && !Array.isArray(group)) {
+            for (const [k, v] of Object.entries(group as Record<string, any>)) {
+              if (!v.deprecated) all[k] = v;
+            }
+          }
+        }
+        setMcjarTypes(all);
+      })
+      .catch(() => {});
+  }, [isMinecraftEgg]);
+
+  // Fetch MC versions when type changes — GET /api/v2/builds/{TYPE} returns object keyed by version
+  useEffect(() => {
+    if (!selectedMcType) { setMcVersions([]); setSelectedMcVersion(''); setMcBuilds([]); setSelectedMcBuild(''); return; }
+    setMcLoading(true);
+    fetch(`https://mcjars.app/api/v2/builds/${selectedMcType}`)
+      .then((r) => r.json())
+      .then((d) => {
+        // Response: { builds: { "1.21.4": { latest: {...}, ... }, ... } }
+        const versionsObj: Record<string, any> = d.builds ?? {};
+        // Sort versions descending (newest first) by keeping stable order from API
+        const versions = Object.keys(versionsObj).reverse();
+        setMcVersions(versions);
+        setSelectedMcVersion('');
+        setMcBuilds([]);
+        setSelectedMcBuild('');
+      })
+      .catch(() => {})
+      .finally(() => setMcLoading(false));
+  }, [selectedMcType]);
+
+  // Fetch builds when version changes — GET /api/v2/builds/{TYPE}/{VERSION}
+  useEffect(() => {
+    if (!selectedMcType || !selectedMcVersion) { setMcBuilds([]); setSelectedMcBuild(''); return; }
+    setMcLoading(true);
+    fetch(`https://mcjars.app/api/v2/builds/${selectedMcType}/${selectedMcVersion}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const builds: any[] = d.builds ?? [];
+        setMcBuilds(builds);
+        if (builds.length > 0) {
+          const latest = builds[0];
+          const buildNum = latest.buildNumber?.toString() ?? latest.id?.toString() ?? '';
+          setSelectedMcBuild(buildNum);
+          // Get the jar download URL from the installation steps
+          const steps: any[] = latest.installation?.[0] ?? [];
+          const jarStep = steps.find((s: any) => s.type === 'download');
+          const jarUrl = jarStep?.url ?? latest.jarUrl ?? '';
+          const jarFile = jarStep?.file ?? 'server.jar';
+          setEnvOverrides((prev) => {
+            const next = { ...prev };
+            if (mcVersionVar) next[mcVersionVar.env_variable] = selectedMcVersion;
+            if (mcBuildVar) next[mcBuildVar.env_variable] = buildNum;
+            if (mcJarVar) next[mcJarVar.env_variable] = jarUrl;
+            if (mcJarFileVar) next[mcJarFileVar.env_variable] = jarFile;
+            return next;
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setMcLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMcType, selectedMcVersion]);
 
   const DEPLOY_STEPS = [
     'Submitting request',
@@ -241,7 +341,7 @@ export default function CreateServerPage() {
   }, {});
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6 overflow-auto">
+    <div className="flex flex-1 flex-col gap-6 p-6">
       <div className="flex items-center gap-4">
         <Button asChild variant="ghost" size="sm">
           <Link href="/servers">
@@ -336,6 +436,103 @@ export default function CreateServerPage() {
             </CardContent>
           </Card>
 
+          {/* Minecraft Version Picker */}
+          {isMinecraftEgg && Object.keys(mcjarTypes).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Minecraft Version</CardTitle>
+                <CardDescription>Select the server software and version.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                {/* Type grid */}
+                <div>
+                  <p className="text-xs font-medium uppercase text-muted-foreground mb-2">Server Software</p>
+                  <div className="grid grid-cols-3 gap-2 md:grid-cols-4">
+                    {Object.entries(mcjarTypes).map(([key, type]: [string, any]) => (
+                      <button
+                        key={key}
+                        onClick={() => setSelectedMcType(key)}
+                        className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 text-xs font-medium transition hover:border-primary/50 ${
+                          selectedMcType === key ? 'border-primary bg-primary/5' : ''
+                        }`}
+                      >
+                        {type.icon && (
+                          <img src={type.icon} alt={type.name} className="size-7 rounded object-contain" />
+                        )}
+                        <span>{type.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Version picker */}
+                {selectedMcType && (
+                  <div>
+                    <p className="text-xs font-medium uppercase text-muted-foreground mb-2">
+                      Minecraft Version {mcLoading && <span className="normal-case">(loading…)</span>}
+                    </p>
+                    <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+                      {mcVersions.map((v) => (
+                        <button
+                          key={v}
+                          onClick={() => setSelectedMcVersion(v)}
+                          className={`rounded-md border px-3 py-1 text-xs font-mono transition hover:border-primary/50 ${
+                            selectedMcVersion === v ? 'border-primary bg-primary/5 font-bold' : ''
+                          }`}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Build picker — only show if multiple builds for chosen version */}
+                {selectedMcVersion && mcBuilds.length > 1 && (
+                  <div>
+                    <p className="text-xs font-medium uppercase text-muted-foreground mb-2">Build</p>
+                    <select
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                      value={selectedMcBuild}
+                      onChange={(e) => {
+                        const bid = e.target.value;
+                        setSelectedMcBuild(bid);
+                        const build = mcBuilds.find((b) => b.buildNumber?.toString() === bid || b.id?.toString() === bid);
+                        if (build) {
+                          const buildNum = build.buildNumber?.toString() ?? build.id?.toString() ?? '';
+                          const steps: any[] = build.installation?.[0] ?? [];
+                          const jarStep = steps.find((s: any) => s.type === 'download');
+                          const jarUrl = jarStep?.url ?? build.jarUrl ?? '';
+                          const jarFile = jarStep?.file ?? 'server.jar';
+                          setEnvOverrides((prev) => {
+                            const next = { ...prev };
+                            if (mcVersionVar) next[mcVersionVar.env_variable] = selectedMcVersion;
+                            if (mcBuildVar) next[mcBuildVar.env_variable] = buildNum;
+                            if (mcJarVar) next[mcJarVar.env_variable] = jarUrl;
+                            if (mcJarFileVar) next[mcJarFileVar.env_variable] = jarFile;
+                            return next;
+                          });
+                        }
+                      }}
+                    >
+                      {mcBuilds.map((b) => (
+                        <option key={b.id} value={b.buildNumber?.toString() ?? b.id?.toString()}>
+                          {b.name ?? `Build #${b.buildNumber ?? b.id}`} {b.experimental ? '(experimental)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {selectedMcVersion && mcVersionVar && envOverrides[mcVersionVar.env_variable] && (
+                  <p className="text-xs text-muted-foreground truncate">
+                    Version set: <span className="font-mono">{envOverrides[mcVersionVar.env_variable]}</span>{mcBuildVar && envOverrides[mcBuildVar.env_variable] ? ` · Build ${envOverrides[mcBuildVar.env_variable]}` : ''}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Docker Image */}
           {currentEgg && Object.keys(currentEgg.dockerImages ?? {}).length > 1 && (
             <Card>
@@ -406,22 +603,31 @@ export default function CreateServerPage() {
                 <CardDescription>Customize your server configuration.</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
-                {editableVars.map((v) => (
-                  <div key={v.env_variable} className="flex flex-col gap-1.5">
-                    <Label htmlFor={`env-${v.env_variable}`}>{v.name}</Label>
-                    {v.description && (
-                      <p className="text-xs text-muted-foreground">{v.description}</p>
-                    )}
-                    <Input
-                      id={`env-${v.env_variable}`}
-                      value={envOverrides[v.env_variable] ?? v.default_value ?? ''}
-                      onChange={(e) =>
-                        setEnvOverrides((prev) => ({ ...prev, [v.env_variable]: e.target.value }))
-                      }
-                      placeholder={v.default_value || v.env_variable}
-                    />
-                  </div>
-                ))}
+                {editableVars.map((v) => {
+                  const isManagedByPicker = isMinecraftEgg && selectedMcVersion && (
+                    v.env_variable === mcVersionVar?.env_variable ||
+                    v.env_variable === mcBuildVar?.env_variable ||
+                    v.env_variable === mcJarVar?.env_variable ||
+                    v.env_variable === mcJarFileVar?.env_variable
+                  );
+                  return (
+                    <div key={v.env_variable} className="flex flex-col gap-1.5">
+                      <Label htmlFor={`env-${v.env_variable}`}>{v.name}</Label>
+                      {v.description && (
+                        <p className="text-xs text-muted-foreground">{v.description}</p>
+                      )}
+                      <Input
+                        id={`env-${v.env_variable}`}
+                        value={envOverrides[v.env_variable] ?? v.default_value ?? ''}
+                        onChange={(e) =>
+                          setEnvOverrides((prev) => ({ ...prev, [v.env_variable]: e.target.value }))
+                        }
+                        placeholder={v.default_value || v.env_variable}
+                        disabled={!!isManagedByPicker}
+                      />
+                    </div>
+                  );
+                })}
               </CardContent>
             </Card>
           )}

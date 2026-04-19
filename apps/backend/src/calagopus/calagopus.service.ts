@@ -404,7 +404,7 @@ export class CalagopusService {
   }
 
   async clientUpdateDockerImage(serverUuid: string, image: string) {
-    return this.request<any>(`/api/client/servers/${serverUuid}/startup/docker-image`, { method: 'PUT', body: { docker_image: image } });
+    return this.request<any>(`/api/client/servers/${serverUuid}/startup/docker-image`, { method: 'PUT', body: { image } });
   }
 
   // ── Client API: Settings ──

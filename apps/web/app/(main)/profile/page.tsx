@@ -244,7 +244,7 @@ export default function ProfilePage() {
   const initials = (user?.name || user?.email || 'U').charAt(0).toUpperCase();
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6 overflow-auto">
+    <div className="flex flex-1 flex-col gap-6 p-6">
       <div>
         <h1 className="text-2xl font-bold">Profile</h1>
         <p className="text-muted-foreground">Manage your account settings and security</p>

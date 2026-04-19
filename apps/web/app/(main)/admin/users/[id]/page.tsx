@@ -197,7 +197,7 @@ export default function AdminUserDetailPage() {
   const isSelf = detail.id === currentUser?.id;
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6 overflow-auto">
+    <div className="flex flex-1 flex-col gap-6 p-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" asChild>

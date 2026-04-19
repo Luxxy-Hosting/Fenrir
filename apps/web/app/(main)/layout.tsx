@@ -24,14 +24,14 @@ export default async function DashboardLayout({
       }
     >
       <AppSidebar variant="inset" />
-      <SidebarInset className="min-h-0 overflow-hidden flex flex-col">
+      <SidebarInset className="flex flex-col h-svh min-h-0 overflow-hidden">
         <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
           <div className="flex items-center gap-1 px-4 lg:gap-2 lg:px-6">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
           </div>
         </header>
-        <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+        <div className="flex flex-1 flex-col min-h-0 overflow-y-auto">
           {children}
         </div>
         <StatusFooter />

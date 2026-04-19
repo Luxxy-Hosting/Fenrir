@@ -11,7 +11,7 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { ServersService } from './servers.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 
@@ -21,6 +21,7 @@ export class ServersController {
   constructor(private serversService: ServersService) {}
 
   @Get()
+  @SkipThrottle()
   async listMyServers(@Request() req: any) {
     return this.serversService.listUserServers(req.user.id);
   }
@@ -54,6 +55,7 @@ export class ServersController {
   // ── Server detail ──
 
   @Get(':uuid')
+  @SkipThrottle()
   async getServerDetail(@Request() req: any, @Param('uuid') uuid: string) {
     return this.serversService.getServerDetail(req.user.id, uuid);
   }
@@ -98,6 +100,7 @@ export class ServersController {
   // ── WebSocket ──
 
   @Get(':uuid/websocket')
+  @SkipThrottle()
   async getWebsocket(@Request() req: any, @Param('uuid') uuid: string) {
     return this.serversService.getWebsocket(req.user.id, uuid);
   }
@@ -105,6 +108,7 @@ export class ServersController {
   // ── Resources ──
 
   @Get(':uuid/resources')
+  @SkipThrottle()
   async getResources(@Request() req: any, @Param('uuid') uuid: string) {
     return this.serversService.getServerResources(req.user.id, uuid);
   }

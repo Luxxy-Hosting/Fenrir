@@ -65,7 +65,7 @@ export default function DashboardPage() {
   const pct = (used: number, total: number) => (total > 0 ? Math.min(100, (used / total) * 100) : 0);
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6 overflow-auto">
+    <div className="flex flex-1 flex-col gap-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

@@ -124,7 +124,7 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6 overflow-auto">
+    <div className="flex flex-1 flex-col gap-6 p-6">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
         <p className="text-muted-foreground">Configure your panel connection and features.</p>

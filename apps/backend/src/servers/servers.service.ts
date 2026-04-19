@@ -217,7 +217,11 @@ export class ServersService {
       if (data.environment) {
         for (const [key, val] of Object.entries(data.environment)) {
           const varDef = rawEnv.find((v: any) => v.env_variable === key);
-          if (varDef?.user_editable) {
+          if (!varDef) continue;
+          // Allow user_editable vars, or any jar/url/version/build var that exists on the egg
+          const isJarOrUrlVar = /download.*path|download.*url|server.*jar.*file|jar.*file/i.test(varDef.name ?? '') ||
+            /DL_PATH|SERVER_JARFILE|DOWNLOAD_URL|JAR_URL/i.test(key);
+          if (varDef.user_editable || isJarOrUrlVar) {
             environment[key] = val as string;
           }
         }

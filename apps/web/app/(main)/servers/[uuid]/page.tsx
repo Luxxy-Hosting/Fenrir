@@ -166,6 +166,7 @@ export default function ServerDetailPage() {
   const [startupVars, setStartupVars] = useState<any[]>([]);
   const [startupLoading, setStartupLoading] = useState(false);
   const [varEdits, setVarEdits] = useState<Record<string, string>>({});
+  const [dockerImage, setDockerImage] = useState('');
 
   // Settings state
   const [renameValue, setRenameValue] = useState('');
@@ -174,8 +175,9 @@ export default function ServerDetailPage() {
   const [activities, setActivities] = useState<any[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
 
-  // Egg logo
+  // Egg logo + config
   const [eggLogo, setEggLogo] = useState<string | null>(null);
+  const [matchedEgg, setMatchedEgg] = useState<EggConfig | null>(null);
 
   const token = getAccessToken();
 
@@ -190,10 +192,14 @@ export default function ServerDetailPage() {
       setServer(data.server);
       setResources(data.resources);
       setRenameValue(data.server?.name || '');
+      setDockerImage(data.server?.docker_image || '');
       const eggUuid = data.server?.egg?.uuid;
       if (eggUuid && eggsData) {
         const match = eggsData.find((e: EggConfig) => e.remoteUuid === eggUuid);
-        if (match?.logo) setEggLogo(match.logo);
+        if (match) {
+          if (match.logo) setEggLogo(match.logo);
+          setMatchedEgg(match);
+        }
       }
     } catch (err: any) {
       setError(err.message);
@@ -614,10 +620,18 @@ export default function ServerDetailPage() {
     if (!token) return;
     try {
       await api.servers.startup.update(token, uuid, varEdits);
-      loadStartup();
     } catch (err: any) {
       setError(err.message);
     }
+    const currentImage = server?.docker_image ?? '';
+    if (dockerImage && dockerImage !== currentImage) {
+      try {
+        await api.servers.startup.updateDockerImage(token, uuid, dockerImage);
+      } catch (err: any) {
+        setError(err.message);
+      }
+    }
+    loadStartup();
   };
 
   useEffect(() => {
@@ -754,7 +768,7 @@ export default function ServerDetailPage() {
   ];
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-6 min-w-0 overflow-auto">
+    <div className={`flex flex-1 flex-col gap-4 p-6 min-w-0 ${tab === 'console' ? 'overflow-hidden' : ''}`}>
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" asChild>
@@ -831,7 +845,7 @@ export default function ServerDetailPage() {
       {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 
       {/* Tabs */}
-      <div className="flex gap-1 overflow-x-auto rounded-lg border bg-muted/50 p-1">
+      <div className="flex gap-1 overflow-x-auto rounded-lg border bg-muted/50 p-1 scrollbar-none [&::-webkit-scrollbar]:hidden">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -1265,6 +1279,28 @@ export default function ServerDetailPage() {
                 ))}
               </div>
             )}
+            {(() => {
+              const images = matchedEgg?.dockerImages ?? {};
+              const entries = Object.entries(images);
+              if (entries.length <= 1) return null;
+              return (
+                <div className="mt-4 rounded-lg border bg-muted/20 p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-sm font-medium">Docker Image</label>
+                    <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">docker_image</span>
+                  </div>
+                  <select
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono"
+                    value={dockerImage}
+                    onChange={(e) => setDockerImage(e.target.value)}
+                  >
+                    {entries.map(([label, uri]) => (
+                      <option key={uri as string} value={uri as string}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
