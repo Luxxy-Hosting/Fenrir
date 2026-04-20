@@ -30,9 +30,6 @@ A modern game server management panel built with **Next.js** and **NestJS**, des
 |----------|-----------------------------------|
 | Frontend | Next.js, React, Tailwind, shadcn/ui |
 | Backend  | NestJS, Prisma, PostgreSQL        |
-| Auth     | JWT, WebAuthn/Passkeys            |
-| Infra    | Docker, Nginx, Certbot            |
-
 ## Installation
 
 Install Fenrir using Docker with our step-by-step guide:
@@ -47,7 +44,6 @@ curl -o docker-compose.yml https://raw.githubusercontent.com/Luxxy-Hosting/Fenri
 curl -o .env https://raw.githubusercontent.com/Luxxy-Hosting/Fenrir/main/docker/.env.example
 nano .env
 docker compose up -d
-docker compose exec backend npx prisma migrate deploy
 ```
 
 The first registered user is automatically assigned admin.
