@@ -78,17 +78,37 @@ export class AuthService {
     // Create account on Calagopus panel and link it
     let calagopusId: string | null = null;
     try {
-      const username = (user.name || user.email.split('@')[0]).replace(/[^a-zA-Z0-9_.-]/g, '_');
-      const calagopusUser = await this.calagopus.createUser({
-        username,
-        email: user.email,
-        password: dto.password,
-        external_id: user.id,
-      });
-      calagopusId = calagopusUser?.user?.uuid ?? calagopusUser?.uuid ?? null;
+      const base = (user.name || user.email.split('@')[0]).replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 20);
+      const suffix = randomUUID().replace(/-/g, '').substring(0, 6);
+      const username = `${base}_${suffix}`;
+      let calagopusUser: any;
+      try {
+        calagopusUser = await this.calagopus.createUser({
+          username,
+          email: user.email,
+          password: dto.password,
+          external_id: user.id,
+        });
+      } catch (createErr: any) {
+        // 409 = user already exists on panel — look them up by email
+        if (createErr.message?.includes('already exists') || createErr.status === 409 || createErr.getStatus?.() === 409) {
+          console.warn('[register] Panel user already exists, looking up by email...');
+          const list = await this.calagopus.listUsers(1, 50);
+          const existing = (list?.users?.data ?? list?.data ?? []).find((u: any) => u.email === user.email);
+          if (existing?.uuid) calagopusId = existing.uuid;
+        } else {
+          throw createErr;
+        }
+      }
+      if (!calagopusId) {
+        calagopusId = calagopusUser?.user?.uuid
+          ?? calagopusUser?.attributes?.uuid
+          ?? calagopusUser?.uuid
+          ?? null;
+      }
+      console.log('[register] resolved calagopusId:', calagopusId);
     } catch (err: any) {
-      // Don't fail registration if Calagopus is unreachable — log and continue
-      console.warn('Failed to create Calagopus account:', err.message);
+      console.warn('[register] Failed to create Calagopus account:', err.message);
     }
 
     // Create UserResources with calagopusId

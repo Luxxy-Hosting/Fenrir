@@ -128,18 +128,20 @@ export class CalagopusService {
   async createUser(data: { username: string; email: string; password: string; external_id?: string; admin?: boolean; name?: string }) {
     const [name_first = 'Panel', ...rest] = (data.name || data.username || 'Panel User').split(' ');
     const name_last = rest.join(' ') || 'User';
-    return this.request<any>('/api/admin/users', {
-      method: 'POST',
-      body: {
-        username: data.username,
-        email: data.email,
-        password: data.password,
-        name_first,
-        name_last,
-        ...(data.external_id ? { external_id: data.external_id } : {}),
-        ...(data.admin !== undefined ? { root_admin: data.admin } : {}),
-      },
-    });
+    const body = {
+      username: data.username,
+      email: data.email,
+      password: data.password,
+      name_first,
+      name_last,
+      language: 'en',
+      admin: data.admin ?? false,
+      ...(data.external_id ? { external_id: data.external_id } : {}),
+    };
+    console.log('[calagopus] createUser body:', JSON.stringify({ ...body, password: '[REDACTED]' }));
+    const res = await this.request<any>('/api/admin/users', { method: 'POST', body });
+    console.log('[calagopus] createUser response:', JSON.stringify(res));
+    return res;
   }
 
   async updateUser(uuid: string, data: { password?: string; username?: string; email?: string }) {

@@ -331,8 +331,7 @@ export default function ProfilePage() {
           </Card>
 
           {/* Panel Account */}
-          {panelAccount?.linked && (
-            <Card>
+          <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <ServerIcon className="size-5" /> Panel Account
@@ -340,6 +339,10 @@ export default function ProfilePage() {
                 <CardDescription>Your linked game panel account credentials</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
+              {!panelAccount?.linked && (
+                <p className="text-sm text-muted-foreground">No panel account linked. Contact an administrator.</p>
+              )}
+              {panelAccount?.linked && (<>
                 {panelAccount.username && (
                   <div className="flex items-center gap-3">
                     <UserIcon className="size-4 text-muted-foreground shrink-0" />
@@ -404,9 +407,9 @@ export default function ProfilePage() {
                     Reset Password
                   </Button>
                 </div>
+              </>)}
               </CardContent>
             </Card>
-          )}
         </div>
 
         {/* Right column */}

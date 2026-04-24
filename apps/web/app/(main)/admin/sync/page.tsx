@@ -8,6 +8,7 @@ import {
   type LocationConfig,
   type NodeConfig,
   type SyncResult,
+  type MigrateServersResult,
 } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@workspace/ui/components/card';
@@ -31,6 +32,7 @@ export default function AdminSyncPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [result, setResult] = useState<SyncResult | null>(null);
+  const [migrateResult, setMigrateResult] = useState<MigrateServersResult | null>(null);
   const [error, setError] = useState('');
 
   const loadData = useCallback(async () => {
@@ -66,6 +68,22 @@ export default function AdminSyncPage() {
       const res = await api.admin.syncAll(token);
       setResult(res);
       await loadData();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSyncing(null);
+    }
+  };
+
+  const handleMigrateServers = async () => {
+    const token = getAccessToken();
+    if (!token) return;
+    setSyncing('servers');
+    setError('');
+    setMigrateResult(null);
+    try {
+      const res = await api.admin.syncServers(token);
+      setMigrateResult(res);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -156,6 +174,43 @@ export default function AdminSyncPage() {
           </CardContent>
         </Card>
       )}
+
+      {migrateResult && (
+        <Card className="border-emerald-500/30 bg-emerald-500/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle2Icon className="size-5 text-emerald-500" />
+              <p className="font-medium text-emerald-600">Server migration complete</p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {migrateResult.total} servers found · {migrateResult.imported} imported · {migrateResult.skipped} already tracked · {migrateResult.unmatched} unmatched (no linked user)
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ServerIcon className="size-5 text-muted-foreground" />
+              <CardTitle className="text-lg">Migrate Existing Servers</CardTitle>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMigrateServers}
+              disabled={syncing !== null}
+            >
+              {syncing === 'servers' ? <Loader2Icon className="size-3 animate-spin" /> : <RefreshCwIcon className="size-3" />}
+            </Button>
+          </div>
+          <CardDescription>Import servers already on the panel into this panel's database so users can see them.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Matches panel servers to local users via their linked Calagopus account ID. Servers with no matching user are skipped.</p>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Locations */}

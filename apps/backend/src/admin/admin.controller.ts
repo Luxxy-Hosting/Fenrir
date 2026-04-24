@@ -157,6 +157,12 @@ export class AdminController {
     return this.adminService.syncNestsAndEggs();
   }
 
+  @Post('sync/servers')
+  @Permissions('settings.write')
+  migrateServers() {
+    return this.adminService.migrateServers();
+  }
+
   // ── Nodes (read) ──
 
   @Get('nodes')

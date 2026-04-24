@@ -21,7 +21,7 @@ interface EggFull extends EggConfig {
 }
 
 const emptyEgg: Omit<EggFull, 'id'> = {
-  name: '', displayName: '', category: 'Game Servers', logo: null,
+  name: '', displayName: '', category: 'Game Servers', type: '', logo: null,
   free: true, remoteUuid: '', nestUuid: '', dockerImage: '', dockerImages: {},
   startup: '', environment: {},
   featureLimits: { databases: 0, backups: 1, allocations: 1, schedules: 0 },
@@ -115,6 +115,7 @@ export default function AdminEggsPage() {
             <Field label="Name (slug)" value={form.name} onChange={(v) => updateForm('name', v)} />
             <Field label="Display Name" value={form.displayName} onChange={(v) => updateForm('displayName', v)} />
             <Field label="Category" value={form.category} onChange={(v) => updateForm('category', v)} />
+            <Field label="Type (e.g. minecraft)" value={form.type ?? ''} onChange={(v) => updateForm('type', v)} />
             <Field label="Nest UUID (Calagopus)" value={form.nestUuid} onChange={(v) => updateForm('nestUuid', v)} />
             <Field label="Egg UUID (Calagopus)" value={form.remoteUuid} onChange={(v) => updateForm('remoteUuid', v)} />
             <Field label="Docker Image" value={form.dockerImage} onChange={(v) => updateForm('dockerImage', v)} />

@@ -430,6 +430,8 @@ export const api = {
       request<SyncPartialResult>('/admin/sync/nodes', { method: 'POST', token }),
     syncEggs: (token: string) =>
       request<SyncEggsResult>('/admin/sync/eggs', { method: 'POST', token }),
+    syncServers: (token: string) =>
+      request<MigrateServersResult>('/admin/sync/servers', { method: 'POST', token }),
 
     // Roles
     listRoles: (token: string) =>
@@ -541,6 +543,7 @@ export interface EggConfig {
   name: string;
   displayName: string;
   category: string;
+  type: string;
   logo: string | null;
   remoteUuid: string;
   nestUuid: string;
@@ -619,6 +622,13 @@ export interface SyncEggsResult {
   eggs: number;
   created: number;
   updated: number;
+}
+
+export interface MigrateServersResult {
+  total: number;
+  imported: number;
+  skipped: number;
+  unmatched: number;
 }
 
 export interface SyncResult {

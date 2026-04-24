@@ -89,7 +89,11 @@ export default function CreateServerPage() {
   }, [loadData]);
 
   const currentEgg = eggs.find((e) => e.id === selectedEgg);
-  const isMinecraftEgg = currentEgg?.category?.toLowerCase() === 'minecraft';
+  const isMinecraftEgg =
+    currentEgg?.type?.toLowerCase() === 'minecraft' ||
+    currentEgg?.category?.toLowerCase() === 'minecraft' ||
+    /minecraft/i.test(currentEgg?.name ?? '') ||
+    /minecraft/i.test(currentEgg?.displayName ?? '');
 
   const initEnvDefaults = (egg: EggConfig) => {
     const defaults: Record<string, string> = {};

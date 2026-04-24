@@ -205,7 +205,8 @@ export default function ServerDetailPage() {
       setServer(data.server);
       setResources(data.resources);
       setRenameValue(data.server?.name || '');
-      setDockerImage(data.server?.docker_image || '');
+      console.log('[loadServer] container:', data.server?.container, '| docker_image:', data.server?.docker_image, '| image:', data.server?.image);
+      setDockerImage((prev) => prev || data.server?.container?.image || data.server?.docker_image || data.server?.image || '');
       const eggUuid = data.server?.egg?.uuid;
       if (eggUuid && eggsData) {
         const match = eggsData.find((e: EggConfig) => e.remoteUuid === eggUuid);
@@ -636,8 +637,7 @@ export default function ServerDetailPage() {
     } catch (err: any) {
       setError(err.message);
     }
-    const currentImage = server?.docker_image ?? '';
-    if (dockerImage && dockerImage !== currentImage) {
+    if (dockerImage) {
       try {
         await api.servers.startup.updateDockerImage(token, uuid, dockerImage);
       } catch (err: any) {
@@ -811,6 +811,7 @@ export default function ServerDetailPage() {
   }
 
   const isMinecraftServer =
+    matchedEgg?.type?.toLowerCase() === 'minecraft' ||
     matchedEgg?.category?.toLowerCase() === 'minecraft' ||
     /minecraft/i.test(matchedEgg?.name ?? '') ||
     /minecraft/i.test(server?.egg?.name ?? '');

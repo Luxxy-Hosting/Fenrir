@@ -26,6 +26,7 @@ model User {
   passkeys       Passkey[]
   oauthAccounts  OAuthAccount[]
   resources      UserResources?
+  servers        Server[]
   totpSecret     String?
   totpEnabled    Boolean  @default(false)
   createdAt      DateTime @default(now())
@@ -118,6 +119,7 @@ model Egg {
   name         String   @unique
   displayName  String
   category     String   @default("Game Servers")
+  type         String   @default("")
   logo         String?
   free         Boolean  @default(true)
   remoteUuid   String   @unique              // UUID of this egg on the Calagopus panel
@@ -198,6 +200,16 @@ model UserResources {
   lastDailyClaim DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+// ─── Servers (created through this panel) ───
+
+model Server {
+  id          String   @id @default(uuid())
+  uuid        String   @unique              // UUID on the Calagopus panel
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
 }
 
 // ─── Store config ───

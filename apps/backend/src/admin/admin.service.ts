@@ -19,6 +19,7 @@ export class AdminService {
     name: string;
     displayName: string;
     category?: string;
+    type?: string;
     logo?: string;
     free?: boolean;
     remoteUuid: string;
@@ -42,6 +43,7 @@ export class AdminService {
     name: string;
     displayName: string;
     category: string;
+    type: string;
     logo: string;
     free: boolean;
     remoteUuid: string;
@@ -556,7 +558,52 @@ export class AdminService {
   // ── Server management (admin) ──
 
   async listAllServers(page = 1, perPage = 50) {
-    return this.calagopus.listServers(page, perPage);
+    const offset = (page - 1) * perPage;
+    const [dbServers, total] = await Promise.all([
+      this.prisma.server.findMany({ skip: offset, take: perPage, orderBy: { createdAt: 'desc' }, include: { user: { select: { id: true, email: true, name: true } } } }),
+      this.prisma.server.count(),
+    ]);
+    const servers: any[] = [];
+    for (const db of dbServers) {
+      try {
+        const res = await this.calagopus.getServer(db.uuid);
+        const s = res?.server ?? res;
+        if (s) servers.push({ ...s, _owner: db.user });
+      } catch { servers.push({ uuid: db.uuid, name: '(unavailable)', _owner: db.user }); }
+    }
+    return { servers: { data: servers, total, page, perPage } };
+  }
+
+  async migrateServers() {
+    // Fetch all servers from Calagopus panel
+    const allServers = await this.calagopus.fetchAll<any>('/api/admin/servers', 'servers');
+
+    // Build a map of calagopusId → local userId
+    const allResources = await this.prisma.userResources.findMany({
+      where: { calagopusId: { not: null } },
+      select: { userId: true, calagopusId: true },
+    });
+    const cidToUserId = new Map(allResources.map((r) => [r.calagopusId!, r.userId]));
+
+    let imported = 0, skipped = 0, unmatched = 0;
+    for (const s of allServers) {
+      const serverUuid = s.uuid;
+      if (!serverUuid) continue;
+
+      // Skip if already tracked
+      const existing = await this.prisma.server.findUnique({ where: { uuid: serverUuid } });
+      if (existing) { skipped++; continue; }
+
+      // Match owner via calagopusId
+      const ownerCid = s.owner?.uuid ?? s.owner_uuid ?? null;
+      const userId = ownerCid ? cidToUserId.get(ownerCid) : null;
+      if (!userId) { unmatched++; continue; }
+
+      await this.prisma.server.create({ data: { uuid: serverUuid, userId } });
+      imported++;
+    }
+
+    return { total: allServers.length, imported, skipped, unmatched };
   }
 
   async suspendServer(uuid: string) {

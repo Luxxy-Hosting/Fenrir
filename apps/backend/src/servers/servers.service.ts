@@ -53,46 +53,41 @@ export class ServersService {
 
   async listUserServers(userId: string) {
     const resources = await this.getUserResources(userId);
-    if (!resources.calagopusId) {
+
+    // Only show servers tracked in our DB (created through this panel)
+    const dbServers = await this.prisma.server.findMany({ where: { userId } });
+    if (dbServers.length === 0) {
       return { servers: [], resources: this.computeAvailableResources(resources, []) };
     }
-    try {
-      let res: any;
+
+    // Fetch details for each tracked server from Calagopus
+    const servers: any[] = [];
+    for (const dbServer of dbServers) {
       try {
-        res = await this.calagopus.getUserServers(resources.calagopusId);
-      } catch (err: any) {
-        const status = err instanceof HttpException ? err.getStatus() : 0;
-        if (status === 404 || err.message?.toLowerCase().includes('not found')) {
-          return { servers: [], resources: this.computeAvailableResources(resources, []) };
+        const res = await this.calagopus.clientGetServer(dbServer.uuid);
+        const s = res?.server ?? res;
+        if (s) {
+          servers.push({
+            uuid: s.uuid ?? dbServer.uuid,
+            uuidShort: s.uuid_short,
+            name: s.name,
+            description: s.description,
+            status: s.status,
+            suspended: s.is_suspended,
+            limits: s.limits,
+            featureLimits: s.feature_limits,
+            egg: s.egg,
+            node: s.node,
+            allocation: s.allocation,
+          });
         }
-        throw err;
-      }
-      const allServers = res?.servers?.data ?? [];
-
-      // Only show servers whose egg exists in our local DB (i.e. created through this panel)
-      const knownEggs = await this.prisma.egg.findMany({ select: { remoteUuid: true } });
-      const knownEggUuids = new Set(knownEggs.map((e) => e.remoteUuid));
-      const servers = allServers.filter((s: any) => knownEggUuids.has(s.egg?.uuid));
-
-      return {
-        servers: servers.map((s: any) => ({
-          uuid: s.uuid,
-          uuidShort: s.uuid_short,
-          name: s.name,
-          description: s.description,
-          status: s.status,
-          suspended: s.is_suspended,
-          limits: s.limits,
-          featureLimits: s.feature_limits,
-          egg: s.egg,
-          node: s.node,
-          allocation: s.allocation,
-        })),
-        resources: this.computeAvailableResources(resources, servers),
-      };
-    } catch (err: any) {
-      throw new BadRequestException(err.message || 'Failed to fetch servers');
+      } catch { /* server may have been deleted externally — skip */ }
     }
+
+    return {
+      servers,
+      resources: this.computeAvailableResources(resources, servers),
+    };
   }
 
   private computeAvailableResources(resources: any, servers: any[]) {
@@ -304,6 +299,9 @@ export class ServersService {
 
     try {
       const server = await runDeploy(resources.calagopusId!);
+      if (server?.uuid) {
+        await this.prisma.server.create({ data: { uuid: server.uuid, userId } });
+      }
       return { success: true, server: { uuid: server.uuid, uuidShort: server.uuid_short, name: server.name } };
     } catch (err: any) {
       const isOwnerErr = err.message?.toLowerCase().includes('owner') || err.message?.toLowerCase().includes('owner_uuid');
@@ -312,6 +310,9 @@ export class ServersService {
         resources = await this.ensurePanelUser(userId, resources, true);
         try {
           const server = await runDeploy(resources.calagopusId!);
+          if (server?.uuid) {
+            await this.prisma.server.create({ data: { uuid: server.uuid, userId } });
+          }
           return { success: true, server: { uuid: server.uuid, uuidShort: server.uuid_short, name: server.name } };
         } catch (retryErr: any) {
           throw new BadRequestException(retryErr.message || 'Failed to create server after re-linking panel account');
@@ -344,7 +345,7 @@ export class ServersService {
         password: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
         external_id: panelUser.id,
       });
-      const newCid = created?.user?.uuid ?? created?.uuid ?? null;
+      const newCid = created?.user?.uuid ?? created?.attributes?.uuid ?? created?.uuid ?? null;
       if (!newCid) throw new Error('No UUID returned from panel');
       await this.prisma.userResources.update({ where: { userId }, data: { calagopusId: newCid } });
       return this.getUserResources(userId);
@@ -406,6 +407,7 @@ export class ServersService {
     }
 
     await this.calagopus.deleteServer(serverUuid);
+    await this.prisma.server.deleteMany({ where: { uuid: serverUuid } });
     return { success: true };
   }
 
