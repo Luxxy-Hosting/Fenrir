@@ -7,16 +7,25 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_FRONTEND: ghcr.io/luxxy-hosting/fenrir-frontend
-  IMAGE_BACKEND: ghcr.io/luxxy-hosting/fenrir-backend
 
 jobs:
-  build-frontend:
-    name: Build Frontend
-    runs-on: ubuntu-latest
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: read
       packages: write
+    strategy:
+      matrix:
+        include:
+          - name: Frontend
+            image: ghcr.io/luxxy-hosting/fenrir-frontend
+            dockerfile: docker/Dockerfile.frontend
+            login_secret: GITHUB_TOKEN
+          - name: Backend
+            image: ghcr.io/luxxy-hosting/fenrir-backend
+            dockerfile: docker/Dockerfile.backend
+            login_secret: WORKFLOWS_TOKEN
 
     steps:
       - name: Checkout
@@ -27,70 +36,26 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets[matrix.login_secret] }}
 
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_FRONTEND }}
+          images: ${{ matrix.image }}
           tags: |
             type=sha,prefix=
             type=ref,event=branch
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Set up Blacksmith Docker Builder
+        uses: useblacksmith/setup-docker-builder@v1
 
-      - name: Build & Push Frontend
-        uses: docker/build-push-action@v6
+      - name: Build & Push ${{ matrix.name }}
+        uses: useblacksmith/build-push-action@v2
         with:
           context: .
-          file: docker/Dockerfile.frontend
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  build-backend:
-    name: Build Backend
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.WORKFLOWS_TOKEN }}
-
-      - name: Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_BACKEND }}
-          tags: |
-            type=sha,prefix=
-            type=ref,event=branch
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build & Push Backend
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/Dockerfile.backend
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
