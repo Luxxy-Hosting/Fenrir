@@ -56,7 +56,7 @@ export class OAuthService {
       try {
         const calagopusUser = await this.calagopus.createUser({
           email: user.email,
-          username: email.split('@')[0].replace(/[^a-z0-9_]/gi, '_').toLowerCase().substring(0, 32),
+          username: email.split('@')[0].replace(/[^a-z0-9_]/gi, '_').toLowerCase().substring(0, 8) + '_' + Math.random().toString(36).slice(2, 8),
           password: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
         });
         const cid = calagopusUser?.attributes?.uuid || calagopusUser?.attributes?.id?.toString();

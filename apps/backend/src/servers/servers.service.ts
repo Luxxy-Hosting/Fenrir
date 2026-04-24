@@ -336,7 +336,8 @@ export class ServersService {
     // Re-create panel user
     const panelUser = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!panelUser) throw new BadRequestException('User not found');
-    const username = (panelUser.name || panelUser.email.split('@')[0]).replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const base = (panelUser.name || panelUser.email.split('@')[0]).replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 8);
+    const username = `${base}_${Math.random().toString(36).slice(2, 8)}`;
     try {
       const created = await this.calagopus.createUser({
         username,

@@ -78,7 +78,7 @@ export class AuthService {
     // Create account on Calagopus panel and link it
     let calagopusId: string | null = null;
     try {
-      const base = (user.name || user.email.split('@')[0]).replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 20);
+      const base = (user.name || user.email.split('@')[0]).replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 8);
       const suffix = randomUUID().replace(/-/g, '').substring(0, 6);
       const username = `${base}_${suffix}`;
       let calagopusUser: any;
