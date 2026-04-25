@@ -21,11 +21,9 @@ jobs:
           - name: Frontend
             suffix: frontend
             dockerfile: docker/Dockerfile.frontend
-            login_secret: GITHUB_TOKEN
           - name: Backend
             suffix: backend
             dockerfile: docker/Dockerfile.backend
-            login_secret: WORKFLOWS_TOKEN
 
     steps:
       - name: Checkout
@@ -36,7 +34,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets[matrix.login_secret] }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker metadata
         id: meta
