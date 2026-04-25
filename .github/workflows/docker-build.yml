@@ -19,11 +19,11 @@ jobs:
       matrix:
         include:
           - name: Frontend
-            image: ghcr.io/luxxy-hosting/fenrir-frontend
+            suffix: frontend
             dockerfile: docker/Dockerfile.frontend
             login_secret: GITHUB_TOKEN
           - name: Backend
-            image: ghcr.io/luxxy-hosting/fenrir-backend
+            suffix: backend
             dockerfile: docker/Dockerfile.backend
             login_secret: WORKFLOWS_TOKEN
 
@@ -42,7 +42,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ matrix.image }}
+          images: ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.suffix }}
           tags: |
             type=sha,prefix=
             type=ref,event=branch
