@@ -192,6 +192,13 @@ export class ServersService {
     const locationConfig = await this.prisma.location.findUnique({ where: { remoteUuid: data.location } });
     if (!locationConfig) throw new NotFoundException(`Location "${data.location}" not found`);
 
+    if (typeof locationConfig.maxServers === 'number' && locationConfig.maxServers > 0) {
+      const locationServerCount = await this.prisma.server.count({ where: { locationUuid: locationConfig.remoteUuid } });
+      if (locationServerCount >= locationConfig.maxServers) {
+        throw new ForbiddenException(`Location "${locationConfig.name}" is full (${locationServerCount}/${locationConfig.maxServers} servers).`);
+      }
+    }
+
     // Get current servers for resource check — fresh fetch inside lock
     let currentServers: any[] = [];
     try {
@@ -304,16 +311,69 @@ export class ServersService {
       kvm_passthrough_enabled: false,
     };
 
+    const createSpecBase = {
+      name: data.name.trim(),
+      description: null,
+      egg_uuid: eggConfig.remoteUuid,
+      startup: eggConfig.startup,
+      image: selectedImage,
+      variables,
+      limits: {
+        memory: data.ram,
+        memory_overhead: 0,
+        swap: -1,
+        disk: data.disk,
+        cpu: data.cpu,
+        io_weight: 500,
+      },
+      feature_limits: featureLimits,
+      start_on_completion: true,
+      skip_installer: false,
+      pinned_cpus: [] as number[],
+      hugepages_passthrough_enabled: false,
+      kvm_passthrough_enabled: false,
+    };
+
+    const resolveNodeAndAllocation = async (): Promise<{ nodeUuid: string; allocationUuid: string } | null> => {
+      try {
+        const nodesRes = await this.calagopus.listNodes(1, 200);
+        const allNodes = nodesRes?.data ?? nodesRes?.nodes?.data ?? [];
+        const candidateNodes = allNodes
+          .map((n: any) => n?.attributes ?? n)
+          .filter((n: any) => {
+            const nodeLocationUuid = n?.location?.uuid ?? n?.location_uuid ?? null;
+            if (nodeLocationUuid !== locationConfig.remoteUuid) return false;
+            if (n?.daemon_listening === false) return false;
+            if (n?.status && String(n.status).toLowerCase() !== 'active') return false;
+            return true;
+          })
+          .map((n: any) => n.uuid)
+          .filter(Boolean);
+
+        if (candidateNodes.length === 0) return null;
+        return await this.calagopus.findAvailableAllocation(locationConfig.remoteUuid, candidateNodes);
+      } catch {
+        return null;
+      }
+    };
+
     const runDeploy = async (ownerUuid: string) => {
-      const spec = { ...deploySpec, owner_uuid: ownerUuid };
-      const result = await this.calagopus.deployServer(spec);
+      const nodeAndAllocation = await resolveNodeAndAllocation();
+      const result = nodeAndAllocation
+        ? await this.calagopus.createServer({
+            ...createSpecBase,
+            owner_uuid: ownerUuid,
+            node_uuid: nodeAndAllocation.nodeUuid,
+            allocation_uuids: [nodeAndAllocation.allocationUuid],
+          })
+        : await this.calagopus.deployServer({ ...deploySpec, owner_uuid: ownerUuid });
       return result.server ?? result;
     };
 
     try {
       const server = await runDeploy(resources.calagopusId!);
       if (server?.uuid) {
-        await this.prisma.server.create({ data: { uuid: server.uuid, userId } });
+        await this.prisma.server.create({ data: { uuid: server.uuid, userId, locationUuid: locationConfig.remoteUuid } });
       }
       return { success: true, server: { uuid: server.uuid, uuidShort: server.uuid_short, name: server.name } };
     } catch (err: any) {
@@ -324,7 +384,7 @@ export class ServersService {
         try {
           const server = await runDeploy(resources.calagopusId!);
           if (server?.uuid) {
-            await this.prisma.server.create({ data: { uuid: server.uuid, userId } });
+            await this.prisma.server.create({ data: { uuid: server.uuid, userId, locationUuid: locationConfig.remoteUuid } });
           }
           return { success: true, server: { uuid: server.uuid, uuidShort: server.uuid_short, name: server.name } };
         } catch (retryErr: any) {
@@ -633,7 +693,28 @@ export class ServersService {
   }
 
   async getAvailableLocations() {
-    return this.prisma.location.findMany({ orderBy: { name: 'asc' } });
+    const [locations, grouped] = await Promise.all([
+      this.prisma.location.findMany({ orderBy: { name: 'asc' } }),
+      this.prisma.server.groupBy({
+        by: ['locationUuid'],
+        _count: { _all: true },
+        where: { locationUuid: { not: null } },
+      }),
+    ]);
+
+    const byLocation = new Map(grouped.map((item) => [item.locationUuid, item._count._all]));
+    return locations.map((location) => {
+      const currentServers = byLocation.get(location.remoteUuid) ?? 0;
+      const maxServers = location.maxServers;
+      return {
+        ...location,
+        currentServers,
+        availableSlots:
+          typeof maxServers === 'number' && maxServers > 0
+            ? Math.max(maxServers - currentServers, 0)
+            : null,
+      };
+    });
   }
 
   async getAvailablePackages() {

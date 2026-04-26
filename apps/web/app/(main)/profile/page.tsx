@@ -12,6 +12,14 @@ import { Badge } from '@workspace/ui/components/badge';
 import { Separator } from '@workspace/ui/components/separator';
 import { ThemeCustomizer } from '@/components/theme-customizer';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@workspace/ui/components/dialog';
+import {
   CameraIcon,
   SaveIcon,
   ShieldIcon,
@@ -74,6 +82,11 @@ export default function ProfilePage() {
   const [error, setError] = useState('');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletePanelAccount, setDeletePanelAccount] = useState(true);
+  const [deleteSummary, setDeleteSummary] = useState<{ localOwnedServers: number; panelOwnedServers: number; serversToDelete: number } | null>(null);
+  const [deleteSummaryLoading, setDeleteSummaryLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Passkeys
@@ -262,6 +275,40 @@ export default function ProfilePage() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    const token = getAccessToken();
+    if (!token) return;
+    setDeletingAccount(true);
+    setError('');
+    try {
+      await api.users.deleteMe(token, deletePanelAccount);
+      setDeleteDialogOpen(false);
+      await logout();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete account');
+      setDeletingAccount(false);
+    }
+  };
+
+  const loadDeleteSummary = useCallback(async (includePanel: boolean) => {
+    const token = getAccessToken();
+    if (!token) return;
+    setDeleteSummaryLoading(true);
+    try {
+      const summary = await api.users.deleteSummary(token, includePanel);
+      setDeleteSummary(summary);
+    } catch {
+      setDeleteSummary(null);
+    } finally {
+      setDeleteSummaryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!deleteDialogOpen) return;
+    loadDeleteSummary(deletePanelAccount);
+  }, [deleteDialogOpen, deletePanelAccount, loadDeleteSummary]);
+
   const apiBase = typeof window !== 'undefined' ? ((window as any).__ENV__?.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/\/api$/, '') : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/\/api$/, '');
   const rawAvatar = avatarPreview || user?.avatar;
   const avatarSrc = rawAvatar && !rawAvatar.startsWith('blob:') && !rawAvatar.startsWith('http') ? `${apiBase}${rawAvatar}` : rawAvatar;
@@ -334,6 +381,70 @@ export default function ProfilePage() {
               </Button>
             </CardContent>
           </Card>
+
+          <Card className="border-destructive/40">
+            <CardHeader>
+              <CardTitle className="text-destructive">Danger Zone</CardTitle>
+              <CardDescription>Permanently delete your account and all associated access.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="destructive"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                <TrashIcon className="size-4 mr-1" />
+                Delete My Account
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="text-destructive">Delete account?</DialogTitle>
+                <DialogDescription>
+                  This permanently removes your account and cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <label className="flex items-start gap-2 rounded-md border p-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4"
+                  checked={deletePanelAccount}
+                  onChange={(e) => setDeletePanelAccount(e.target.checked)}
+                />
+                <span>
+                  Also delete my linked panel (Calagopus) account and panel servers.
+                </span>
+              </label>
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                {deleteSummaryLoading && 'Checking owned servers...'}
+                {!deleteSummaryLoading && deleteSummary && (
+                  <>
+                    <p>
+                      Servers owned by your account: <span className="font-semibold text-foreground">{deleteSummary.panelOwnedServers}</span>
+                    </p>
+                    <p>
+                      Servers tracked in this panel: <span className="font-semibold text-foreground">{deleteSummary.localOwnedServers}</span>
+                    </p>
+                    <p>
+                      This action will delete: <span className="font-semibold text-destructive">{deleteSummary.serversToDelete}</span> server{deleteSummary.serversToDelete === 1 ? '' : 's'}.
+                    </p>
+                  </>
+                )}
+                {!deleteSummaryLoading && !deleteSummary && 'Unable to load server count right now.'}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={deletingAccount}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={handleDeleteAccount} disabled={deletingAccount}>
+                  {deletingAccount ? <Loader2Icon className="size-4 animate-spin mr-1" /> : <TrashIcon className="size-4 mr-1" />}
+                  {deletingAccount ? 'Deleting...' : 'Confirm Delete'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <Card>
             <CardHeader>

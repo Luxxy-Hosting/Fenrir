@@ -88,6 +88,8 @@ export class AdminService {
     short: string;
     country?: string;
     flag?: string;
+    maxServers?: number | null;
+    latencyCheckUrl?: string | null;
   }) {
     return this.prisma.location.create({ data });
   }
@@ -98,6 +100,8 @@ export class AdminService {
     short: string;
     country: string;
     flag: string;
+    maxServers: number | null;
+    latencyCheckUrl: string | null;
   }>) {
     const loc = await this.prisma.location.findUnique({ where: { id } });
     if (!loc) throw new NotFoundException('Location not found');
@@ -218,7 +222,12 @@ export class AdminService {
       if (existing) {
         await this.prisma.location.update({
           where: { remoteUuid: loc.uuid },
-          data: { name: loc.name ?? existing.name, short: loc.short ?? existing.short },
+          data: {
+            name: loc.name ?? existing.name,
+            short: loc.short ?? existing.short,
+            maxServers: existing.maxServers,
+            latencyCheckUrl: existing.latencyCheckUrl,
+          },
         });
         updated++;
       } else {

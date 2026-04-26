@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Param,
+  Query,
   Patch,
   Delete,
   Post,
@@ -42,6 +43,23 @@ export class UsersController {
   @Get('me/panel-account')
   getPanelAccount(@Request() req: any) {
     return this.usersService.getPanelAccount(req.user.id);
+  }
+
+  @Delete('me')
+  deleteMyAccount(
+    @Request() req: any,
+    @Body() body?: { deletePanelAccount?: boolean },
+  ) {
+    return this.usersService.deleteMyAccount(req.user.id, body?.deletePanelAccount ?? true);
+  }
+
+  @Get('me/delete-summary')
+  getDeleteSummary(
+    @Request() req: any,
+    @Query('deletePanelAccount') deletePanelAccount?: string,
+  ) {
+    const shouldDeletePanelAccount = deletePanelAccount !== 'false';
+    return this.usersService.getDeleteSummary(req.user.id, shouldDeletePanelAccount);
   }
 
   @Post('me/panel-account/reset-password')
