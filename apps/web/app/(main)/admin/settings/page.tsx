@@ -68,6 +68,9 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const docsBaseUrl = (typeof window !== 'undefined'
+    ? ((window as any).__ENV__?.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api')
+    : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api')).replace(/\/$/, '');
 
   const loadSettings = useCallback(async () => {
     const token = getAccessToken();
@@ -461,11 +464,11 @@ export default function AdminSettingsPage() {
               <div className="text-sm">
                 <p className="font-medium">Documentation links</p>
                 <p className="text-muted-foreground mt-1">
-                  <a className="underline underline-offset-2" href="/api/openapi" target="_blank" rel="noreferrer">OpenAPI page</a>
+                  <a className="underline underline-offset-2" href={`${docsBaseUrl}/openapi`} target="_blank" rel="noreferrer">OpenAPI page</a>
                   {' · '}
-                  <a className="underline underline-offset-2" href="/api/openapi/json" target="_blank" rel="noreferrer">JSON</a>
+                  <a className="underline underline-offset-2" href={`${docsBaseUrl}/openapi/json`} target="_blank" rel="noreferrer">JSON</a>
                   {' · '}
-                  <a className="underline underline-offset-2" href="/api/openapi/yml" target="_blank" rel="noreferrer">YAML</a>
+                  <a className="underline underline-offset-2" href={`${docsBaseUrl}/openapi/yml`} target="_blank" rel="noreferrer">YAML</a>
                 </p>
               </div>
             </CardContent>
