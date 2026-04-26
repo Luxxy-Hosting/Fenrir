@@ -547,6 +547,8 @@ export interface EggConfig {
   category: string;
   type: string;
   logo: string | null;
+  enabled: boolean;
+  packageIds: string[];
   remoteUuid: string;
   nestUuid: string;
   dockerImage: string;
