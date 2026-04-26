@@ -148,6 +148,10 @@ export class CalagopusService {
     return this.request<any>(`/api/admin/users/${uuid}`, { method: 'PATCH', body: data });
   }
 
+  async deleteUser(uuid: string) {
+    return this.request<any>(`/api/admin/users/${uuid}`, { method: 'DELETE' });
+  }
+
   async getUserServers(userUuid: string, page = 1, perPage = 100) {
     return this.request<any>(`/api/admin/users/${userUuid}/servers`, { params: { page, per_page: perPage } });
   }

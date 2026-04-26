@@ -104,6 +104,70 @@ export class UsersService {
     return { message: 'User deleted successfully' };
   }
 
+  async deleteMyAccount(userId: string, deletePanelAccount = true) {
+    const resources = await this.prisma.userResources.findUnique({ where: { userId } });
+    if (deletePanelAccount) {
+      const serversToDelete = await this.getOwnedServerUuids(userId, resources?.calagopusId ?? null);
+      for (const serverUuid of serversToDelete) {
+        try {
+          await this.calagopus.deleteServer(serverUuid, true, true);
+        } catch (err: any) {
+          throw new BadRequestException(`Failed to delete linked panel server ${serverUuid}: ${err.message || 'unknown error'}`);
+        }
+      }
+
+      if (resources?.calagopusId) {
+        try {
+          await this.calagopus.deleteUser(resources.calagopusId);
+        } catch (err: any) {
+          throw new BadRequestException(`Failed to delete linked panel account: ${err.message || 'unknown error'}`);
+        }
+      }
+    }
+
+    await this.prisma.user.delete({ where: { id: userId } });
+    return { message: 'Your account has been deleted' };
+  }
+
+  async getDeleteSummary(userId: string, deletePanelAccount = true) {
+    const resources = await this.prisma.userResources.findUnique({ where: { userId } });
+    const localOwnedServers = await this.prisma.server.count({ where: { userId } });
+    const allOwnedServerUuids = await this.getOwnedServerUuids(userId, resources?.calagopusId ?? null);
+
+    return {
+      deletePanelAccount,
+      localOwnedServers,
+      panelOwnedServers: allOwnedServerUuids.length,
+      serversToDelete: deletePanelAccount ? allOwnedServerUuids.length : 0,
+    };
+  }
+
+  private async getOwnedServerUuids(userId: string, calagopusId: string | null): Promise<string[]> {
+    const uuids = new Set<string>();
+
+    const localServers = await this.prisma.server.findMany({
+      where: { userId },
+      select: { uuid: true },
+    });
+    for (const server of localServers) {
+      if (server.uuid) uuids.add(server.uuid);
+    }
+
+    if (calagopusId) {
+      const servers = await this.calagopus
+        .fetchAll<any>(`/api/admin/users/${calagopusId}/servers`, 'servers', 100)
+        .catch(() => []);
+
+      for (const server of servers) {
+        const attributes = server?.attributes ?? server;
+        const serverUuid = attributes?.uuid;
+        if (serverUuid) uuids.add(serverUuid);
+      }
+    }
+
+    return [...uuids];
+  }
+
   async updateProfile(userId: string, data: { name?: string }) {
     const user = await this.prisma.user.update({
       where: { id: userId },

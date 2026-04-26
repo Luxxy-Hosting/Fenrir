@@ -83,7 +83,7 @@ function flagUrl(code: string) {
   return `https://flagcdn.com/w40/${code.toLowerCase()}.png`;
 }
 
-const emptyLoc = { remoteUuid: '', name: '', short: '', country: '', flag: '' };
+const emptyLoc = { remoteUuid: '', name: '', short: '', country: '', flag: '', maxServers: '', latencyCheckUrl: '' };
 
 export default function AdminLocationsPage() {
   const { hasRole } = use(AuthenticationContext);
@@ -108,18 +108,34 @@ export default function AdminLocationsPage() {
   useEffect(() => { load(); }, [load]);
 
   const startNew = () => { setEditing('new'); setForm({ ...emptyLoc }); };
-  const startEdit = (loc: LocationConfig) => { setEditing(loc.id); setForm({ ...loc }); };
+  const startEdit = (loc: LocationConfig) => {
+    setEditing(loc.id);
+    setForm({
+      ...loc,
+      maxServers: loc.maxServers ?? '',
+      latencyCheckUrl: loc.latencyCheckUrl ?? '',
+    });
+  };
   const cancel = () => { setEditing(null); setForm({}); };
 
   const save = async () => {
     const token = getAccessToken();
     if (!token) return;
     setMessage(null);
+    const payload = {
+      ...form,
+      country: form.country?.trim() ? form.country.trim() : null,
+      flag: form.flag?.trim() ? form.flag.trim() : null,
+      maxServers: form.maxServers === '' || form.maxServers === null || form.maxServers === undefined
+        ? null
+        : Math.max(1, Number(form.maxServers)),
+      latencyCheckUrl: form.latencyCheckUrl?.trim() ? form.latencyCheckUrl.trim() : null,
+    };
     try {
       if (editing === 'new') {
-        await api.admin.createLocation(token, form);
+        await api.admin.createLocation(token, payload);
       } else if (editing) {
-        await api.admin.updateLocation(token, editing, form);
+        await api.admin.updateLocation(token, editing, payload);
       }
       setEditing(null);
       load();
@@ -187,6 +203,24 @@ export default function AdminLocationsPage() {
               <Label className="text-xs">Country Flag</Label>
               <FlagPicker value={form.flag ?? ''} onChange={(code) => updateForm('flag', code)} />
             </div>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs">Max Servers (optional)</Label>
+              <Input
+                type="number"
+                min={1}
+                placeholder="Unlimited"
+                value={form.maxServers ?? ''}
+                onChange={(e) => updateForm('maxServers', e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs">Latency Check URL (optional)</Label>
+              <Input
+                placeholder="https://example-node-host/ping"
+                value={form.latencyCheckUrl ?? ''}
+                onChange={(e) => updateForm('latencyCheckUrl', e.target.value)}
+              />
+            </div>
             <div className="flex items-end gap-2">
               <Button variant="outline" onClick={cancel}><XIcon data-icon="inline-start" /> Cancel</Button>
               <Button onClick={save}><CheckIcon data-icon="inline-start" /> Save</Button>
@@ -208,7 +242,7 @@ export default function AdminLocationsPage() {
                 )}
                 <div>
                   <p className="font-medium">{loc.name}</p>
-                  <p className="text-xs text-muted-foreground">{loc.remoteUuid.slice(0, 8)}... · {loc.short}{loc.country ? ` · ${loc.country}` : ''}</p>
+                  <p className="text-xs text-muted-foreground">{loc.remoteUuid.slice(0, 8)}... · {loc.short}{loc.country ? ` · ${loc.country}` : ''}{loc.maxServers ? ` · cap ${loc.maxServers}` : ''}</p>
                 </div>
               </div>
               <div className="flex gap-1">

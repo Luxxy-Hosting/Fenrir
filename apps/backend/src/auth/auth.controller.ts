@@ -84,7 +84,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async passkeyRegisterOptions(@Req() req: Request) {
     const user = await this.getUser(req);
-    return this.authService.passkeyRegistrationOptions(user.id);
+    return this.authService.passkeyRegistrationOptions(user.id, req.headers.origin);
   }
 
   @Post('passkey/register/verify')
@@ -92,19 +92,19 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async passkeyRegisterVerify(@Req() req: Request, @Body() body: any) {
     const user = await this.getUser(req);
-    return this.authService.passkeyRegistrationVerify(user.id, body?.credential, body?.name);
+    return this.authService.passkeyRegistrationVerify(user.id, body?.credential, body?.name, req.headers.origin);
   }
 
   @Post('passkey/authenticate/options')
   @HttpCode(HttpStatus.OK)
-  async passkeyAuthOptions() {
-    return this.authService.passkeyAuthenticationOptions();
+  async passkeyAuthOptions(@Req() req: Request) {
+    return this.authService.passkeyAuthenticationOptions(req.headers.origin);
   }
 
   @Post('passkey/authenticate/verify')
   @HttpCode(HttpStatus.OK)
   async passkeyAuthVerify(@Req() req: Request, @Body() body: any) {
-    return this.authService.passkeyAuthenticationVerify(body?.challengeId, body?.credential, req.ip, req.headers['user-agent']);
+    return this.authService.passkeyAuthenticationVerify(body?.challengeId, body?.credential, req.ip, req.headers['user-agent'], req.headers.origin);
   }
 
   @Get('passkeys')

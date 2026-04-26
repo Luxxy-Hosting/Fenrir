@@ -48,6 +48,7 @@ export default function CreateServerPage() {
   const [cpu, setCpu] = useState(100);
   const [envOverrides, setEnvOverrides] = useState<Record<string, string>>({});
   const [selectedImage, setSelectedImage] = useState('');
+  const [locationLatency, setLocationLatency] = useState<Record<string, number | null>>({});
 
   // Minecraft version picker
   const [mcjarTypes, setMcjarTypes] = useState<Record<string, any>>({});
@@ -94,6 +95,35 @@ export default function CreateServerPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (locations.length === 0) return;
+    let cancelled = false;
+
+    const checkLatency = async () => {
+      const entries = await Promise.all(locations.map(async (loc) => {
+        const url = loc.latencyCheckUrl?.trim();
+        if (!url) return [loc.remoteUuid, null] as const;
+        const start = performance.now();
+        try {
+          await fetch(url, { method: 'GET', mode: 'no-cors', cache: 'no-store' });
+          return [loc.remoteUuid, Math.round(performance.now() - start)] as const;
+        } catch {
+          return [loc.remoteUuid, null] as const;
+        }
+      }));
+
+      if (cancelled) return;
+      setLocationLatency(Object.fromEntries(entries));
+    };
+
+    checkLatency();
+    const id = window.setInterval(checkLatency, 10_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [locations]);
 
   const currentEgg = eggs.find((e) => e.id === selectedEgg);
   const isMinecraftEgg =
@@ -575,29 +605,39 @@ export default function CreateServerPage() {
           <Card>
             <CardHeader>
               <CardTitle>Location</CardTitle>
-              <CardDescription>Choose where to deploy your server.</CardDescription>
+              <CardDescription>Select by lowest latency and available slots. Latency refreshes every 10 seconds.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                 {locations.map((loc) => (
                   <button
                     key={loc.id}
-                    className={`flex items-center gap-2 rounded-lg border p-3 text-sm transition hover:border-primary/50 ${
+                    className={`flex items-center justify-between gap-2 rounded-lg border p-3 text-sm transition hover:border-primary/50 ${
                       selectedLocation === loc.remoteUuid ? 'border-primary bg-primary/5' : ''
                     }`}
                     onClick={() => setSelectedLocation(loc.remoteUuid)}
                   >
-                    {loc.flag && (
-                      <img
-                        src={`https://flagcdn.com/w40/${loc.flag.toLowerCase()}.png`}
-                        alt={loc.flag}
-                        className="h-4 w-6 object-cover rounded-sm"
-                      />
-                    )}
-                    <div className="text-left">
-                      <p className="font-medium">{loc.name}</p>
-                      <p className="text-xs text-muted-foreground">{loc.short}</p>
+                    <div className="flex items-center gap-2">
+                      {loc.flag && (
+                        <img
+                          src={`https://flagcdn.com/w40/${loc.flag.toLowerCase()}.png`}
+                          alt={loc.flag}
+                          className="h-4 w-6 object-cover rounded-sm"
+                        />
+                      )}
+                      <div className="text-left">
+                        <p className="font-medium">{loc.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {loc.currentServers ?? 0}
+                          {typeof loc.maxServers === 'number' && loc.maxServers > 0 ? `/${loc.maxServers}` : ''}
+                          {' '}servers
+                          {typeof loc.availableSlots === 'number' ? ` · ${loc.availableSlots} free` : ''}
+                        </p>
+                      </div>
                     </div>
+                    <p className="text-xs text-muted-foreground whitespace-nowrap">
+                      {locationLatency[loc.remoteUuid] == null ? '—' : `${locationLatency[loc.remoteUuid]} ms`}
+                    </p>
                   </button>
                 ))}
                 {locations.length === 0 && (

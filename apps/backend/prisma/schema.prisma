@@ -151,6 +151,8 @@ model Location {
   short      String
   country    String?
   flag       String?
+  maxServers Int?
+  latencyCheckUrl String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
@@ -211,6 +213,7 @@ model Server {
   uuid        String   @unique              // UUID on the Calagopus panel
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  locationUuid String?
   createdAt   DateTime @default(now())
 }
 

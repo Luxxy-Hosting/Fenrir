@@ -185,6 +185,12 @@ export const api = {
     delete: (token: string, id: string) =>
       request<{ message: string }>(`/users/${id}`, { method: 'DELETE', token }),
 
+    deleteMe: (token: string, deletePanelAccount = true) =>
+      request<{ message: string }>('/users/me', { method: 'DELETE', token, body: { deletePanelAccount } }),
+
+    deleteSummary: (token: string, deletePanelAccount = true) =>
+      request<{ deletePanelAccount: boolean; localOwnedServers: number; panelOwnedServers: number; serversToDelete: number }>(`/users/me/delete-summary?deletePanelAccount=${deletePanelAccount}`, { token }),
+
     updateProfile: (token: string, data: { name?: string }) =>
       request<{ id: string; email: string; name: string | null; avatar: string | null }>('/users/me/profile', { method: 'PATCH', token, body: data }),
 
@@ -571,6 +577,10 @@ export interface LocationConfig {
   short: string;
   country: string | null;
   flag: string | null;
+  maxServers?: number | null;
+  latencyCheckUrl?: string | null;
+  currentServers?: number;
+  availableSlots?: number | null;
 }
 
 export interface PackageConfig {

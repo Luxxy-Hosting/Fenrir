@@ -419,21 +419,26 @@ export class AuthService {
 
   // ─── Passkey / WebAuthn ───
 
-  private getRpInfo() {
-    const rpId = process.env.WEBAUTHN_RP_ID || 'localhost';
+  private async getRpInfo(requestOrigin?: string) {
+    const configuredOrigin = await this.settingsService.get('cors.origin');
+    const envOrigin = process.env.CORS_ORIGIN;
+    const fallbackOrigin = 'http://localhost:3000';
+    const resolvedOrigin = requestOrigin || configuredOrigin || envOrigin || fallbackOrigin;
+    const parsed = new URL(resolvedOrigin);
+    const rpId = process.env.WEBAUTHN_RP_ID || parsed.hostname;
     const rpName = process.env.WEBAUTHN_RP_NAME || 'Panel';
-    const origin = process.env.WEBAUTHN_ORIGIN || `http://${rpId}:3000`;
+    const origin = process.env.WEBAUTHN_ORIGIN || `${parsed.protocol}//${parsed.host}`;
     return { rpId, rpName, origin };
   }
 
-  async passkeyRegistrationOptions(userId: string) {
+  async passkeyRegistrationOptions(userId: string, requestOrigin?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { passkeys: true },
     });
     if (!user) throw new NotFoundException('User not found');
 
-    const { rpId, rpName } = this.getRpInfo();
+    const { rpId, rpName } = await this.getRpInfo(requestOrigin);
 
     const options = await generateRegistrationOptions({
       rpName,
@@ -460,14 +465,14 @@ export class AuthService {
     return options;
   }
 
-  async passkeyRegistrationVerify(userId: string, body: any, name?: string) {
+  async passkeyRegistrationVerify(userId: string, body: any, name?: string, requestOrigin?: string) {
     const stored = this.challenges.get(`reg:${userId}`);
     if (!stored || stored.expires < Date.now()) {
       throw new BadRequestException('Registration challenge expired or missing');
     }
     this.challenges.delete(`reg:${userId}`);
 
-    const { rpId, origin } = this.getRpInfo();
+    const { rpId, origin } = await this.getRpInfo(requestOrigin);
 
     console.log('[Passkey] Registration verify:', { rpId, origin, bodyKeys: body ? Object.keys(body) : 'null' });
 
@@ -506,8 +511,8 @@ export class AuthService {
     return { verified: true };
   }
 
-  async passkeyAuthenticationOptions() {
-    const { rpId } = this.getRpInfo();
+  async passkeyAuthenticationOptions(requestOrigin?: string) {
+    const { rpId } = await this.getRpInfo(requestOrigin);
 
     const options = await generateAuthenticationOptions({
       rpID: rpId,
@@ -523,7 +528,7 @@ export class AuthService {
     return { ...options, challengeId };
   }
 
-  async passkeyAuthenticationVerify(challengeId: string, body: any, ipAddress?: string, userAgent?: string) {
+  async passkeyAuthenticationVerify(challengeId: string, body: any, ipAddress?: string, userAgent?: string, requestOrigin?: string) {
     const stored = this.challenges.get(`auth:${challengeId}`);
     if (!stored || stored.expires < Date.now()) {
       throw new BadRequestException('Authentication challenge expired or missing');
@@ -545,7 +550,7 @@ export class AuthService {
       throw new UnauthorizedException('Passkey not found');
     }
 
-    const { rpId, origin } = this.getRpInfo();
+    const { rpId, origin } = await this.getRpInfo(requestOrigin);
 
     const verification = await verifyAuthenticationResponse({
       response: body,
