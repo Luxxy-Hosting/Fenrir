@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext, TooManyRequestsException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
 import { SettingsService } from '../settings/settings.service.js';
 
 @Injectable()
@@ -59,7 +59,7 @@ export class OpenApiGuard implements CanActivate {
     }
 
     if (bucket.count >= safeLimit) {
-      throw new TooManyRequestsException(message);
+      throw new HttpException(message, HttpStatus.TOO_MANY_REQUESTS);
     }
 
     bucket.count += 1;
