@@ -143,6 +143,7 @@ export default function AdminSettingsPage() {
           <TabsTrigger value="panel">Panel Connection</TabsTrigger>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="economy">Economy</TabsTrigger>
+          <TabsTrigger value="openapi">OpenAPI</TabsTrigger>
           <TabsTrigger value="afk">AFK</TabsTrigger>
           <TabsTrigger value="email">Email</TabsTrigger>
           <TabsTrigger value="oauth">OAuth</TabsTrigger>
@@ -376,6 +377,96 @@ export default function AdminSettingsPage() {
                     onChange={(e) => handleChange("ads.slot", e.target.value)}
                   />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="openapi" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>OpenAPI / Automation</CardTitle>
+              <CardDescription>Configure API key access, rate limits, and documentation links.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col gap-2 flex-1">
+                  <Label htmlFor="openapi-enabled">OpenAPI Access</Label>
+                  <select
+                    id="openapi-enabled"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                    value={settings["openapi.enabled"] || "true"}
+                    onChange={(e) => handleChange("openapi.enabled", e.target.value)}
+                  >
+                    <option value="true">Enabled</option>
+                    <option value="false">Disabled</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2 flex-1">
+                  <Label htmlFor="openapi-key">OpenAPI Key</Label>
+                  <Input
+                    id="openapi-key"
+                    type="password"
+                    placeholder="Paste or generate a strong API key"
+                    value={settings["openapi.key"] || ""}
+                    onChange={(e) => handleChange("openapi.key", e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="my-1 border-t border-border" />
+              <p className="text-sm font-medium">Rate limits</p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="openapi-rate-short-limit">Short window limit</Label>
+                  <Input
+                    id="openapi-rate-short-limit"
+                    type="number"
+                    placeholder="5"
+                    value={settings["openapi.rate.short.limit"] || ""}
+                    onChange={(e) => handleChange("openapi.rate.short.limit", e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="openapi-rate-short-ttl">Short window TTL (seconds)</Label>
+                  <Input
+                    id="openapi-rate-short-ttl"
+                    type="number"
+                    placeholder="1"
+                    value={settings["openapi.rate.short.ttl"] || ""}
+                    onChange={(e) => handleChange("openapi.rate.short.ttl", e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="openapi-rate-medium-limit">Medium window limit</Label>
+                  <Input
+                    id="openapi-rate-medium-limit"
+                    type="number"
+                    placeholder="100"
+                    value={settings["openapi.rate.medium.limit"] || ""}
+                    onChange={(e) => handleChange("openapi.rate.medium.limit", e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="openapi-rate-medium-ttl">Medium window TTL (seconds)</Label>
+                  <Input
+                    id="openapi-rate-medium-ttl"
+                    type="number"
+                    placeholder="60"
+                    value={settings["openapi.rate.medium.ttl"] || ""}
+                    onChange={(e) => handleChange("openapi.rate.medium.ttl", e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="my-1 border-t border-border" />
+              <div className="text-sm">
+                <p className="font-medium">Documentation links</p>
+                <p className="text-muted-foreground mt-1">
+                  <a className="underline underline-offset-2" href="/api/openapi" target="_blank" rel="noreferrer">OpenAPI page</a>
+                  {' · '}
+                  <a className="underline underline-offset-2" href="/api/openapi/json" target="_blank" rel="noreferrer">JSON</a>
+                  {' · '}
+                  <a className="underline underline-offset-2" href="/api/openapi/yml" target="_blank" rel="noreferrer">YAML</a>
+                </p>
               </div>
             </CardContent>
           </Card>

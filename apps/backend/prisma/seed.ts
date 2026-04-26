@@ -99,6 +99,11 @@ async function main() {
     'ads.slot': '',
     'ads.layout': 'in-article',
     'ads.format': 'fluid',
+    'openapi.enabled': 'true',
+    'openapi.rate.short.limit': '5',
+    'openapi.rate.short.ttl': '1',
+    'openapi.rate.medium.limit': '100',
+    'openapi.rate.medium.ttl': '60',
   };
 
   for (const [key, value] of Object.entries(defaultSettings)) {
