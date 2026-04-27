@@ -27,6 +27,8 @@ model User {
   oauthAccounts  OAuthAccount[]
   resources      UserResources?
   servers        Server[]
+  tickets        Ticket[]
+  ticketMessages TicketMessage[]
   totpSecret     String?
   totpEnabled    Boolean  @default(false)
   createdAt      DateTime @default(now())
@@ -228,4 +230,71 @@ model StoreItem {
   enabled  Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketCategory {
+  GENERAL
+  BILLING
+  TECHNICAL
+  ACCOUNT
+}
+
+model Ticket {
+  id            String         @id @default(uuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject       String
+  category      TicketCategory @default(GENERAL)
+  priority      TicketPriority @default(MEDIUM)
+  status        TicketStatus   @default(OPEN)
+  lastMessageAt DateTime       @default(now())
+  closedAt      DateTime?
+  messages      TicketMessage[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([userId, status])
+  @@index([status, lastMessageAt])
+}
+
+model TicketMessage {
+  id        String   @id @default(uuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  isAdmin   Boolean  @default(false)
+  message   String
+  attachments TicketAttachment[]
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@index([userId])
+}
+
+model TicketAttachment {
+  id           String        @id @default(uuid())
+  messageId    String
+  message      TicketMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  fileName     String
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  createdAt    DateTime      @default(now())
+
+  @@index([messageId])
 }

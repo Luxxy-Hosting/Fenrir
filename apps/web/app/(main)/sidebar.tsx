@@ -42,6 +42,7 @@ import {
   RefreshCwIcon,
   UsersIcon,
   KeyIcon,
+  MessageSquareIcon,
   ChevronRightIcon,
   MoonIcon,
   SunIcon,
@@ -78,6 +79,7 @@ function getInitials(source: string | undefined | null): string {
 const navMain: NavItem[] = [
   { title: "Dashboard", url: "/", icon: LayoutDashboardIcon },
   { title: "Servers", url: "/servers", icon: ServerIcon },
+  { title: "Tickets", url: "/tickets", icon: MessageSquareIcon },
   { title: "Profile", url: "/profile", icon: UserIcon },
   { title: "Store", url: "/store", icon: StoreIcon },
   { title: "AFK", url: "/afk", icon: ClockIcon },
@@ -85,6 +87,12 @@ const navMain: NavItem[] = [
 
 const navAdmin: NavItem[] = [
   { title: "Admin", url: "/admin", icon: ShieldIcon, permission: "users.read" },
+  {
+    title: "Tickets",
+    url: "/admin/tickets",
+    icon: MessageSquareIcon,
+    permission: "tickets.read",
+  },
   {
     title: "Users",
     url: "/admin/users",
@@ -271,7 +279,11 @@ function CollapsedAvatar() {
                 className="flex size-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-80"
               >
                 {src ? (
-                  <img src={src} alt="Avatar" className="size-full object-cover" />
+                  <img
+                    src={src}
+                    alt="Avatar"
+                    className="size-full object-cover"
+                  />
                 ) : isLoading ? (
                   "·"
                 ) : (
@@ -290,12 +302,20 @@ function CollapsedAvatar() {
               <DropdownMenuItem onClick={() => setTheme("light")}>
                 <SunIcon className="size-4" />
                 <span>Light mode</span>
-                {!isDark ? <span className="ml-auto text-xs text-muted-foreground">Active</span> : null}
+                {!isDark ? (
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    Active
+                  </span>
+                ) : null}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTheme("dark")}>
                 <MoonIcon className="size-4" />
                 <span>Dark mode</span>
-                {isDark ? <span className="ml-auto text-xs text-muted-foreground">Active</span> : null}
+                {isDark ? (
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    Active
+                  </span>
+                ) : null}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onClick={() => logout()}>
@@ -320,8 +340,18 @@ function UserCard() {
   React.useEffect(() => {
     const token = getAccessToken()
     if (!token) return
-    cachedFetch("sidebar:resources", () => api.store.resources(token), 60 * 1000)
-      .then((resources) => setPlanName(resources.package?.name ? `${resources.package.name} plan` : "Default plan"))
+    cachedFetch(
+      "sidebar:resources",
+      () => api.store.resources(token),
+      60 * 1000
+    )
+      .then((resources) =>
+        setPlanName(
+          resources.package?.name
+            ? `${resources.package.name} plan`
+            : "Default plan"
+        )
+      )
       .catch(() => setPlanName("Default plan"))
   }, [])
 
@@ -369,12 +399,20 @@ function UserCard() {
         <DropdownMenuItem onClick={() => setTheme("light")}>
           <SunIcon className="size-4" />
           <span>Light mode</span>
-          {!isDark ? <span className="ml-auto text-xs text-muted-foreground">Active</span> : null}
+          {!isDark ? (
+            <span className="ml-auto text-xs text-muted-foreground">
+              Active
+            </span>
+          ) : null}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme("dark")}>
           <MoonIcon className="size-4" />
           <span>Dark mode</span>
-          {isDark ? <span className="ml-auto text-xs text-muted-foreground">Active</span> : null}
+          {isDark ? (
+            <span className="ml-auto text-xs text-muted-foreground">
+              Active
+            </span>
+          ) : null}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={() => logout()}>

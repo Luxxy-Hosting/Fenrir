@@ -16,6 +16,7 @@ import { AdminModule } from './admin/admin.module.js';
 import { AfkModule } from './afk/afk.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { OpenApiModule } from './openapi/openapi.module.js';
+import { TicketsModule } from './tickets/tickets.module.js';
 
 @Module({
   imports: [
@@ -39,11 +40,9 @@ import { OpenApiModule } from './openapi/openapi.module.js';
     AfkModule,
     MailModule,
     OpenApiModule,
+    TicketsModule,
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
-  ],
+  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

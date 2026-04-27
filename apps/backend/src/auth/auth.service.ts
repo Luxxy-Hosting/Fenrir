@@ -18,15 +18,16 @@ import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
-import type {
-  AuthenticatorTransportFuture,
-} from '@simplewebauthn/server';
+import type { AuthenticatorTransportFuture } from '@simplewebauthn/server';
 import { MailService } from '../mail/mail.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 
 @Injectable()
 export class AuthService {
-  private challenges = new Map<string, { challenge: string; expires: number }>();
+  private challenges = new Map<
+    string,
+    { challenge: string; expires: number }
+  >();
 
   constructor(
     private prisma: PrismaService,
@@ -78,7 +79,9 @@ export class AuthService {
     // Create account on Calagopus panel and link it
     let calagopusId: string | null = null;
     try {
-      const base = (user.name || user.email.split('@')[0]).replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 8);
+      const base = (user.name || user.email.split('@')[0])
+        .replace(/[^a-zA-Z0-9_]/g, '_')
+        .substring(0, 8);
       const suffix = randomUUID().replace(/-/g, '').substring(0, 6);
       const username = `${base}_${suffix}`;
       let calagopusUser: any;
@@ -91,28 +94,42 @@ export class AuthService {
         });
       } catch (createErr: any) {
         // 409 = user already exists on panel — look them up by email
-        if (createErr.message?.includes('already exists') || createErr.status === 409 || createErr.getStatus?.() === 409) {
-          console.warn('[register] Panel user already exists, looking up by email...');
+        if (
+          createErr.message?.includes('already exists') ||
+          createErr.status === 409 ||
+          createErr.getStatus?.() === 409
+        ) {
+          console.warn(
+            '[register] Panel user already exists, looking up by email...',
+          );
           const list = await this.calagopus.listUsers(1, 50);
-          const existing = (list?.users?.data ?? list?.data ?? []).find((u: any) => u.email === user.email);
+          const existing = (list?.users?.data ?? list?.data ?? []).find(
+            (u: any) => u.email === user.email,
+          );
           if (existing?.uuid) calagopusId = existing.uuid;
         } else {
           throw createErr;
         }
       }
       if (!calagopusId) {
-        calagopusId = calagopusUser?.user?.uuid
-          ?? calagopusUser?.attributes?.uuid
-          ?? calagopusUser?.uuid
-          ?? null;
+        calagopusId =
+          calagopusUser?.user?.uuid ??
+          calagopusUser?.attributes?.uuid ??
+          calagopusUser?.uuid ??
+          null;
       }
       console.log('[register] resolved calagopusId:', calagopusId);
     } catch (err: any) {
-      console.warn('[register] Failed to create Calagopus account:', err.message);
+      console.warn(
+        '[register] Failed to create Calagopus account:',
+        err.message,
+      );
     }
 
     // Create UserResources with calagopusId
-    const defaultPkg = await this.prisma.package.findFirst({ where: { isDefault: true } });
+    const defaultPkg = await this.prisma.package.findFirst({
+      where: { isDefault: true },
+    });
     await this.prisma.userResources.create({
       data: {
         userId: user.id,
@@ -122,14 +139,19 @@ export class AuthService {
     });
 
     // Email verification
-    const emailVerifyEnabled = await this.settingsService.get('mail.verify_email');
+    const emailVerifyEnabled =
+      await this.settingsService.get('mail.verify_email');
     if (emailVerifyEnabled === 'true') {
       const emailToken = randomBytes(32).toString('hex');
       await this.prisma.user.update({
         where: { id: user.id },
         data: { emailToken },
       });
-      await this.mailService.sendVerificationEmail(user.email, user.name || user.email, emailToken);
+      await this.mailService.sendVerificationEmail(
+        user.email,
+        user.name || user.email,
+        emailToken,
+      );
     } else {
       await this.prisma.user.update({
         where: { id: user.id },
@@ -137,8 +159,18 @@ export class AuthService {
       });
     }
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role.name);
-    await this.createSession(user.id, tokens.accessToken, tokens.refreshToken, ipAddress, userAgent);
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      user.role.name,
+    );
+    await this.createSession(
+      user.id,
+      tokens.accessToken,
+      tokens.refreshToken,
+      ipAddress,
+      userAgent,
+    );
 
     return {
       user: {
@@ -154,7 +186,9 @@ export class AuthService {
   }
 
   async verifyEmail(token: string) {
-    const user = await this.prisma.user.findUnique({ where: { emailToken: token } });
+    const user = await this.prisma.user.findUnique({
+      where: { emailToken: token },
+    });
     if (!user) {
       throw new BadRequestException('Invalid or expired verification token');
     }
@@ -196,11 +230,28 @@ export class AuthService {
       return { require2fa: true, challengeToken };
     }
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role.name);
-    await this.createSession(user.id, tokens.accessToken, tokens.refreshToken, ipAddress, userAgent);
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      user.role.name,
+    );
+    await this.createSession(
+      user.id,
+      tokens.accessToken,
+      tokens.refreshToken,
+      ipAddress,
+      userAgent,
+    );
 
     // Send new login notification email
-    this.mailService.sendNewLoginEmail(user.email, user.name || user.email, ipAddress, userAgent).catch(() => {});
+    this.mailService
+      .sendNewLoginEmail(
+        user.email,
+        user.name || user.email,
+        ipAddress,
+        userAgent,
+      )
+      .catch(() => {});
 
     return {
       user: {
@@ -241,7 +292,11 @@ export class AuthService {
     }
 
     const user = session.user;
-    const tokens = await this.generateTokens(user.id, user.email, user.role.name);
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      user.role.name,
+    );
 
     await this.prisma.session.update({
       where: { id: session.id },
@@ -268,12 +323,31 @@ export class AuthService {
   async completeLogin(userId: string, ipAddress?: string, userAgent?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { role: { include: { permissions: { include: { permission: true } } } } },
+      include: {
+        role: { include: { permissions: { include: { permission: true } } } },
+      },
     });
     if (!user) throw new UnauthorizedException('User not found');
-    const tokens = await this.generateTokens(user.id, user.email, user.role.name);
-    await this.createSession(user.id, tokens.accessToken, tokens.refreshToken, ipAddress, userAgent);
-    this.mailService.sendNewLoginEmail(user.email, user.name || user.email, ipAddress, userAgent).catch(() => {});
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      user.role.name,
+    );
+    await this.createSession(
+      user.id,
+      tokens.accessToken,
+      tokens.refreshToken,
+      ipAddress,
+      userAgent,
+    );
+    this.mailService
+      .sendNewLoginEmail(
+        user.email,
+        user.name || user.email,
+        ipAddress,
+        userAgent,
+      )
+      .catch(() => {});
     return {
       user: {
         id: user.id,
@@ -387,6 +461,11 @@ export class AuthService {
       { name: 'packages.write', description: 'Create and update packages' },
       { name: 'store.read', description: 'View store' },
       { name: 'store.write', description: 'Update store' },
+      { name: 'tickets.read', description: 'View support tickets' },
+      {
+        name: 'tickets.write',
+        description: 'Reply to and update support tickets',
+      },
     ];
 
     for (const perm of defaultPermissions) {
@@ -423,11 +502,13 @@ export class AuthService {
     const configuredOrigin = await this.settingsService.get('cors.origin');
     const envOrigin = process.env.CORS_ORIGIN;
     const fallbackOrigin = 'http://localhost:3000';
-    const resolvedOrigin = requestOrigin || configuredOrigin || envOrigin || fallbackOrigin;
+    const resolvedOrigin =
+      requestOrigin || configuredOrigin || envOrigin || fallbackOrigin;
     const parsed = new URL(resolvedOrigin);
     const rpId = process.env.WEBAUTHN_RP_ID || parsed.hostname;
     const rpName = process.env.WEBAUTHN_RP_NAME || 'Panel';
-    const origin = process.env.WEBAUTHN_ORIGIN || `${parsed.protocol}//${parsed.host}`;
+    const origin =
+      process.env.WEBAUTHN_ORIGIN || `${parsed.protocol}//${parsed.host}`;
     return { rpId, rpName, origin };
   }
 
@@ -465,16 +546,27 @@ export class AuthService {
     return options;
   }
 
-  async passkeyRegistrationVerify(userId: string, body: any, name?: string, requestOrigin?: string) {
+  async passkeyRegistrationVerify(
+    userId: string,
+    body: any,
+    name?: string,
+    requestOrigin?: string,
+  ) {
     const stored = this.challenges.get(`reg:${userId}`);
     if (!stored || stored.expires < Date.now()) {
-      throw new BadRequestException('Registration challenge expired or missing');
+      throw new BadRequestException(
+        'Registration challenge expired or missing',
+      );
     }
     this.challenges.delete(`reg:${userId}`);
 
     const { rpId, origin } = await this.getRpInfo(requestOrigin);
 
-    console.log('[Passkey] Registration verify:', { rpId, origin, bodyKeys: body ? Object.keys(body) : 'null' });
+    console.log('[Passkey] Registration verify:', {
+      rpId,
+      origin,
+      bodyKeys: body ? Object.keys(body) : 'null',
+    });
 
     let verification;
     try {
@@ -486,14 +578,17 @@ export class AuthService {
       });
     } catch (err: any) {
       console.error('[Passkey] Registration verify error:', err.message);
-      throw new BadRequestException(err.message || 'Passkey registration failed');
+      throw new BadRequestException(
+        err.message || 'Passkey registration failed',
+      );
     }
 
     if (!verification.verified || !verification.registrationInfo) {
       throw new BadRequestException('Passkey registration failed');
     }
 
-    const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
+    const { credential, credentialDeviceType, credentialBackedUp } =
+      verification.registrationInfo;
 
     await this.prisma.passkey.create({
       data: {
@@ -528,10 +623,18 @@ export class AuthService {
     return { ...options, challengeId };
   }
 
-  async passkeyAuthenticationVerify(challengeId: string, body: any, ipAddress?: string, userAgent?: string, requestOrigin?: string) {
+  async passkeyAuthenticationVerify(
+    challengeId: string,
+    body: any,
+    ipAddress?: string,
+    userAgent?: string,
+    requestOrigin?: string,
+  ) {
     const stored = this.challenges.get(`auth:${challengeId}`);
     if (!stored || stored.expires < Date.now()) {
-      throw new BadRequestException('Authentication challenge expired or missing');
+      throw new BadRequestException(
+        'Authentication challenge expired or missing',
+      );
     }
     this.challenges.delete(`auth:${challengeId}`);
 
@@ -540,7 +643,9 @@ export class AuthService {
       include: {
         user: {
           include: {
-            role: { include: { permissions: { include: { permission: true } } } },
+            role: {
+              include: { permissions: { include: { permission: true } } },
+            },
           },
         },
       },
@@ -575,11 +680,28 @@ export class AuthService {
     });
 
     const user = passkey.user;
-    const tokens = await this.generateTokens(user.id, user.email, user.role.name);
-    await this.createSession(user.id, tokens.accessToken, tokens.refreshToken, ipAddress, userAgent);
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      user.role.name,
+    );
+    await this.createSession(
+      user.id,
+      tokens.accessToken,
+      tokens.refreshToken,
+      ipAddress,
+      userAgent,
+    );
 
     // Send new login notification email
-    this.mailService.sendNewLoginEmail(user.email, user.name || user.email, ipAddress, userAgent).catch(() => {});
+    this.mailService
+      .sendNewLoginEmail(
+        user.email,
+        user.name || user.email,
+        ipAddress,
+        userAgent,
+      )
+      .catch(() => {});
 
     return {
       user: {
@@ -597,7 +719,13 @@ export class AuthService {
   async listSessions(userId: string, currentToken: string) {
     const sessions = await this.prisma.session.findMany({
       where: { userId, expiresAt: { gt: new Date() } },
-      select: { id: true, ipAddress: true, userAgent: true, createdAt: true, token: true },
+      select: {
+        id: true,
+        ipAddress: true,
+        userAgent: true,
+        createdAt: true,
+        token: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
     return sessions.map((s) => ({
@@ -615,7 +743,9 @@ export class AuthService {
     });
     if (!session) throw new NotFoundException('Session not found');
     if (session.token === currentToken) {
-      throw new BadRequestException('Cannot revoke your current session. Use logout instead.');
+      throw new BadRequestException(
+        'Cannot revoke your current session. Use logout instead.',
+      );
     }
     await this.prisma.session.delete({ where: { id: sessionId } });
     return { message: 'Session revoked' };
@@ -624,7 +754,14 @@ export class AuthService {
   async listPasskeys(userId: string) {
     return this.prisma.passkey.findMany({
       where: { userId },
-      select: { id: true, credentialId: true, name: true, deviceType: true, backedUp: true, createdAt: true },
+      select: {
+        id: true,
+        credentialId: true,
+        name: true,
+        deviceType: true,
+        backedUp: true,
+        createdAt: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
